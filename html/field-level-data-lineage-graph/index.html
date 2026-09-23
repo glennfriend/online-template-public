@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 標題由 DATA 注入; 這裡只放 fallback -->
+<title>依賴血緣圖</title>
+<style>
+/* ============================================================
+ * 區塊 1 / 結構 + 主題 (零資料)
+ * 顏色 token 用 mode key 命名 (--input / --direct / --derive),
+ * 引擎以 var(--<mode>) 取色, 資料只寫 mode key.
+ * ============================================================ */
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1f2b; --muted:#5f6e87; --line:#e4e9f1;
+  --shadow:0 1px 2px rgba(20,30,50,.05),0 3px 12px rgba(20,30,50,.05);
+  /* 模式色 (對應資料的 mode key) */
+  --input:#1f2937; --direct:#16a34a; --derive:#2563eb;
+  --edge:#c3ccda; --edge-hot:#2563eb;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f131a; --panel:#161c26; --ink:#e7ecf3; --muted:#93a1b8; --line:#28313f;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.22);
+    --input:#374151; --direct:#34d17f; --derive:#5b9bff;
+    --edge:#3a4557; --edge-hot:#5b9bff;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",system-ui,sans-serif,
+  "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
+  line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:22px 16px 50px}
+h1{font-size:24px;margin:0 0 4px}
+.sub{margin:0;color:var(--muted);font-size:15px;max-width:820px}
+.sub b{color:var(--ink)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0 10px}
+.toolbar button{cursor:pointer;font:inherit;font-size:14px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink);border-radius:20px;padding:7px 16px;transition:.15s;box-shadow:var(--shadow)}
+.toolbar button:hover{border-color:var(--derive);color:var(--derive)}
+.toolbar button.on{background:var(--derive);color:#fff;border-color:var(--derive)}
+/* 色塊圖例 (按鈕最右邊) */
+.legend{display:flex;flex-wrap:wrap;gap:11px;margin-left:auto;font-size:13.5px;color:var(--muted);align-items:center}
+.legend div{display:flex;align-items:center;gap:6px}
+.legend .sep{width:1px;height:15px;background:var(--line)}
+.dot{width:12px;height:12px;border-radius:3px;flex:none}
+
+.canvas{overflow:hidden;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+/* 圖寬度跟著畫布縮放: 寬螢幕照原尺寸, 窄螢幕等比例縮小, 不出現捲軸 */
+svg{display:block;width:100%;height:auto;margin:0 auto}
+
+.node{width:100%;height:100%;display:flex;align-items:center;cursor:pointer}
+.pill{border-radius:9px;padding:0 10px;height:36px;font-size:14px;font-weight:600;display:flex;
+  align-items:center;gap:7px;width:100%;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.1);
+  transition:filter .12s,opacity .12s;overflow:hidden;border:2px solid transparent}
+.pill .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill .cnt{background:rgba(255,255,255,.28);border-radius:20px;padding:0 8px;font-size:12px;font-weight:700;flex:none}
+.pill:hover{filter:brightness(1.08)}
+/* 模式底色 (class 由引擎以 p-<mode> 產生) */
+.p-input{background:var(--input)} .p-direct{background:var(--direct)} .p-derive{background:var(--derive)}
+
+.dim{opacity:.15}
+.hot{outline:2px solid var(--edge-hot);outline-offset:1px;border-radius:11px}
+
+path.link{fill:none;stroke:var(--edge);stroke-width:1.4;transition:stroke .12s,stroke-width .12s,opacity .12s}
+path.link.dim{opacity:.08}
+path.link.hot{stroke:var(--edge-hot);stroke-width:2.4}
+
+.colhead{font-size:13px;font-weight:700;fill:var(--muted);letter-spacing:.02em}
+.colsub{font-size:11.5px;fill:var(--muted)}
+
+footer{margin-top:22px;font-size:14px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+footer b{color:var(--ink)}
+footer p{margin:6px 0}
+.notes-h{font-weight:700;color:var(--ink);margin:2px 0 6px}
+.notes-list{margin:0 0 12px;padding-left:20px}
+.notes-list li{margin:5px 0;line-height:1.6}
+/* 即時 tooltip (只給有額外訊息的元素, 用 data-tip) */
+.tip{position:fixed;z-index:10;pointer-events:none;display:none;max-width:300px;
+  background:var(--ink);color:var(--bg);font-size:13.5px;line-height:1.5;border-radius:8px;padding:6px 10px;box-shadow:var(--shadow)}</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- 內容全部由「區塊 3 · 引擎」從「區塊 2 · 資料」注入 -->
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+
+  <div class="toolbar">
+    <button data-node="h_cardio">心血管</button>
+    <button data-node="h_immune">免疫力</button>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="canvas"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+  <footer id="footer"></footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<!-- ============================================================
+ * 區塊 2 / 資料 (零邏輯)
+ * 只描述「要畫什麼」. 換掉這一段就換一張血緣圖, 區塊 1 / 3 不用動.
+ * 主題: 飲食營養 · 營養素與健康的關係
+ * ⚠ 常識級整理, 非醫療或營養建議.
+ * ============================================================ -->
+<script>
+window.LINEAGE = {
+
+  /* ---- 文案 ---- */
+  meta: {
+    title: '飲食營養',
+    subtitle: '營養素與健康的關係, 依賴血緣圖',
+
+    /* 底部「怎麼看這張圖」的條列 (色塊圖例在頂部, 由 modes / avail 自動產生) */
+    guide: [
+      '左到右 = 推導深度: 越右邊, 要湊齊越多前提才算得出來.',
+      '🫙 會傳染: 前提常缺乏, 算出來的吸收率與健康影響也標 🫙, 一樣不可靠 (連鎖).',
+      '點 <b>心血管</b> 或 <b>免疫力</b> 看它受哪些營養影響; 點任一欄位看它的上下游; 滑鼠移到欄位上可看推導公式與說明.',
+    ],
+    /* 補充段落 (標題 + 內文) */
+    extra: [
+      {
+        h: '為什麼用有向無環圖 (DAG), 不用心智圖',
+        t: '心智圖是樹, 每個節點只有一個父. 但 心血管影響 要 4 個前提、鐵吸收 同時要 鐵 + 維生素C (跨兩營養)、骨質健康 要先有鈣吸收 (2 跳). 樹畫不出多前提與推導接力, 所以改用有向無環圖: 箭頭只往一個方向, 不會繞回原點, 一個節點可以有很多個前提.',
+      },
+      {
+        h: '備註',
+        t: '維生素D 雖印在標示上, 人體主要靠日曬合成, 食物估值僅供參考. omega-3 需深海魚才足, 外食常不足. 本圖為版型示範與營養交互作用的常識級整理, <b>非醫療或營養建議</b>, 個人化請洽專業.',
+      },
+    ],
+  },
+
+  /* ---- 每個深度一欄的抬頭 (index = 深度) ---- */
+  columns: [
+    { head: '輸入源',   sub: '你攝取的來源' },
+    { head: '直接營養', sub: '食品標示直接查' },
+    { head: '一階推導', sub: '吸收 / 比例 / 負擔' },
+    { head: '健康影響', sub: '綜合多項營養' },
+  ],
+
+  /* ---- 模式定義 (顏色 = 這個值怎麼來的) ----
+   * label / desc : 顯示名 + 圖例說明
+   * stable       : 穩定度策略 always | byAvail | inherit
+   * count        : 是否顯示「N 源」徽章
+   * 顏色由 CSS 變數 --<key> 提供 (見區塊 1).
+   */
+  modes: {
+    input:  { label: '輸入源',   desc: '通常一日攝取 / 補充劑',             stable: 'always',  count: false },
+    direct: { label: '直接營養', desc: '食品標示直接查到的含量',            stable: 'byAvail', count: false },
+    derive: { label: '推導',     desc: '需要計算 (吸收率 / 比例 / 健康影響)', stable: 'inherit', count: true  },
+  },
+  legendModes: ['input', 'direct', 'derive'],
+
+  /* ---- 可得性 (direct 專用) ----
+   * legend: 色塊區右半的標記 (mark = emoji, 也會標在節點前)
+   */
+  avail: {
+    stable:   '標示必有',
+    unstable: '常缺乏',
+    legend: { mark: '🫙', text: '常缺乏' },
+  },
+
+  /* ---- 深度 0 由左到右的排序 ---- */
+  order: ['in_daily', 'in_supp'],
+
+  /* ---- 節點 ---- */
+  nodes: [
+
+    /* ---- 輸入源 (深度 0) ---- */
+    { id: 'in_daily', m: 'input', label: '通常一日攝取', deps: [] },
+    { id: 'in_supp',  m: 'input', label: '補充劑',       deps: [] },
+
+    /* ---- 直接營養 · 從標示拆出 (深度 1) ----
+     * 必有 = 美國營養標示強制項; 常缺乏 = 標示常不列 (節點前標 🫙)
+     * 部分微量營養也常靠補充劑, deps 同時接 in_supp
+     */
+    { id: 'd_protein',   m: 'direct', avail: '標示必有', label: '蛋白質',       deps: ['in_daily'] },
+    { id: 'd_carb',      m: 'direct', avail: '標示必有', label: '碳水',         deps: ['in_daily'] },
+    { id: 'd_satfat',    m: 'direct', avail: '標示必有', label: '飽和脂肪',     deps: ['in_daily'] },
+    { id: 'd_sodium',    m: 'direct', avail: '標示必有', label: '鈉',           deps: ['in_daily'] },
+    { id: 'd_addsugar',  m: 'direct', avail: '標示必有', label: '添加糖',       deps: ['in_daily'] },
+    { id: 'd_fiber',     m: 'direct', avail: '標示必有', label: '膳食纖維',     deps: ['in_daily'] },
+    { id: 'd_potassium', m: 'direct', avail: '標示必有', label: '鉀',           deps: ['in_daily'] },
+    { id: 'd_vitd',      m: 'direct', avail: '標示必有', label: '維生素 D',     deps: ['in_daily', 'in_supp'] },
+    { id: 'd_calcium',   m: 'direct', avail: '標示必有', label: '鈣',           deps: ['in_daily', 'in_supp'] },
+    { id: 'd_iron',      m: 'direct', avail: '標示必有', label: '鐵',           deps: ['in_daily', 'in_supp'] },
+    { id: 'd_vitc',      m: 'direct', avail: '常缺乏', label: '維生素 C',       deps: ['in_daily', 'in_supp'] },
+    { id: 'd_omega3',    m: 'direct', avail: '常缺乏', label: 'omega-3',        deps: ['in_daily', 'in_supp'], src: '深海魚才足, 外食常不足' },
+    { id: 'd_omega6',    m: 'direct', avail: '常缺乏', label: 'omega-6',        deps: ['in_daily'] },
+    { id: 'd_b12',       m: 'direct', avail: '常缺乏', label: '維生素 B12',     deps: ['in_daily', 'in_supp'] },
+    { id: 'd_folate',    m: 'direct', avail: '常缺乏', label: '葉酸',           deps: ['in_daily'] },
+
+    /* ---- 一階推導 · 吸收 / 比例 / 負擔 (深度 2) ---- */
+    { id: 'v_iron_abs', m: 'derive', label: '鐵吸收效率',    deps: ['d_iron', 'd_vitc'],                  src: '鐵 + 維生素C (C 助吸收)' },
+    { id: 'v_ca_abs',   m: 'derive', label: '鈣吸收效率',    deps: ['d_calcium', 'd_vitd'],               src: '鈣 + 維生素D (D 助吸收)' },
+    { id: 'v_omega',    m: 'derive', label: 'omega-3/6 比例', deps: ['d_omega3', 'd_omega6'],              src: 'omega-3 : omega-6, 失衡易發炎' },
+    { id: 'v_glucose',  m: 'derive', label: '血糖負擔',      deps: ['d_addsugar', 'd_carb', 'd_fiber'],    src: '添加糖 + 碳水 - 膳食纖維' },
+    { id: 'v_nak',      m: 'derive', label: '鈉鉀平衡',      deps: ['d_sodium', 'd_potassium'],            src: '鈉 : 鉀, 影響血壓' },
+    { id: 'v_gut',      m: 'derive', label: '腸道健康',      deps: ['d_fiber'],                            src: '膳食纖維 -> 腸道菌相' },
+
+    /* ---- 健康影響 · 二階推導 (深度 3) ---- */
+    { id: 'h_cardio', m: 'derive', label: '心血管影響', deps: ['v_omega', 'v_nak', 'd_satfat', 'v_glucose'], src: 'omega 比例 + 鈉鉀平衡 + 飽和脂肪 + 血糖負擔' },
+    { id: 'h_immune', m: 'derive', label: '免疫力',     deps: ['d_vitc', 'd_vitd', 'v_gut'],                 src: '維生素C + 維生素D + 腸道健康' },
+    { id: 'h_bone',   m: 'derive', label: '骨質健康',   deps: ['v_ca_abs', 'd_vitd', 'd_protein'],           src: '鈣吸收 + 維生素D + 蛋白質' },
+    { id: 'h_anemia', m: 'derive', label: '貧血風險',   deps: ['v_iron_abs', 'd_b12', 'd_folate'],           src: '鐵吸收 + B12 + 葉酸' },
+
+  ],
+};
+</script>
+
+<!-- ============================================================
+ * 區塊 3 / 引擎 (零資料)
+ * 只做「怎麼畫、怎麼互動」: 算深度、算穩定度、排版、渲染、點選.
+ * 讀 window.LINEAGE (區塊 2), 不寫死任何欄位.
+ * ============================================================ -->
+<script>
+(function () {
+'use strict';
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const D = window.LINEAGE;
+if (!D) { throw new Error('引擎: 找不到 window.LINEAGE, 請確認區塊 2 · 資料 在前'); }
+
+const NODES = D.nodes;
+const MODES = D.modes;
+const AVAIL = D.avail;
+const COLS  = D.columns;
+
+/* ---- 索引 ---- */
+const BYID = {};      NODES.forEach(n => BYID[n.id] = n);
+const CHILDREN = {};  NODES.forEach(n => CHILDREN[n.id] = []);
+NODES.forEach(n => n.deps.forEach(d => { if (CHILDREN[d]) CHILDREN[d].push(n.id); }));
+
+/* ---- 深度 = 最長依賴路徑 ---- */
+const _depth = {};
+function depth(id) {
+  if (id in _depth) return _depth[id];
+  const n = BYID[id];
+  return _depth[id] = n.deps.length ? Math.max(...n.deps.map(depth)) + 1 : 0;
+}
+NODES.forEach(n => depth(n.id));
+const MAXD = Math.max(...NODES.map(n => _depth[n.id]));
+
+/* ---- 穩定度 (依 modes[*].stable 策略, 常缺乏的來源會往下游傳染) ---- */
+const _stable = {};
+function stable(id) {
+  if (id in _stable) return _stable[id];
+  const n = BYID[id];
+  const strat = MODES[n.m].stable;
+  let s;
+  if (strat === 'always') s = true;
+  else if (strat === 'byAvail') s = (n.avail !== AVAIL.unstable);
+  else s = n.deps.every(stable);           // inherit
+  return _stable[id] = s;
+}
+NODES.forEach(n => stable(n.id));
+
+/* ---- 圖走訪 ---- */
+function ancestors(id, acc) {
+  acc = acc || new Set();
+  BYID[id].deps.forEach(d => { if (!acc.has(d)) { acc.add(d); ancestors(d, acc); } });
+  return acc;
+}
+function descendants(id, acc) {
+  acc = acc || new Set();
+  CHILDREN[id].forEach(c => { if (!acc.has(c)) { acc.add(c); descendants(c, acc); } });
+  return acc;
+}
+
+/* ---- 版面常數 ---- */
+const svg  = document.getElementById('svg');
+const HEAD_Y = 40, TOP = 66, ROW = 48, NODEH = 36, NODEW = 236, STRIDE = 305, PADX = 24;
+const COLX = d => PADX + d * STRIDE;
+const svgW = COLX(MAXD) + NODEW + PADX;
+
+/* selected  : 目前聚焦的節點 (點按鈕或點節點都會設)
+ * activeBtn : 目前「按下」的焦點按鈕; 直接點節點會清掉 (按鈕回彈) */
+let selected = null, activeBtn = null;
+
+/* ---- 排版: 依深度分欄, 用重心排序減少交叉 ---- */
+function layout() {
+  const cols = {}; for (let d = 0; d <= MAXD; d++) cols[d] = [];
+  NODES.forEach(n => cols[_depth[n.id]].push(n));
+  const pos = {};
+  for (let d = 0; d <= MAXD; d++) {
+    const list = cols[d];
+    if (d === 0 && Array.isArray(D.order)) {
+      const order = D.order;
+      list.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    } else {
+      list.forEach(n => {
+        const ps = n.deps.filter(p => p in pos);
+        n._bc = ps.length ? ps.reduce((s, p) => s + pos[p], 0) / ps.length : 1e9;
+      });
+      list.sort((a, b) => a._bc - b._bc);
+    }
+    list.forEach((n, i) => { pos[n.id] = i; });
+  }
+  const maxCount = Math.max(...Object.values(cols).map(c => c.length));
+  const H = TOP + maxCount * ROW + 20;
+  const xy = {};
+  for (let d = 0; d <= MAXD; d++) {
+    const list = cols[d];
+    const y0 = TOP + (maxCount * ROW - list.length * ROW) / 2;
+    list.forEach((n, i) => { xy[n.id] = { x: COLX(d), y: y0 + i * ROW + (ROW - NODEH) / 2 }; });
+  }
+  return { xy, H };
+}
+
+function bez(x1, y1, x2, y2) { const dx = (x2 - x1) * 0.5; return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`; }
+function el(tag, attrs) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function modeColor(m) { return getComputedStyle(document.documentElement).getPropertyValue('--' + m).trim(); }
+function isRoot(n) { return n.deps.length === 0; }   /* 沒有前提 = 來源 */
+function tipAttr(msg) { return msg ? ` data-tip="${msg}"` : ''; }   /* 沒有額外訊息就不給 tip */
+function isUnstable(n) { return !stable(n.id) && !isRoot(n); }
+
+/* ---- 渲染 SVG ---- */
+function render() {
+  const { xy, H } = layout();
+  svg.setAttribute('viewBox', `0 0 ${svgW} ${H}`); svg.style.maxWidth = svgW + 'px';
+  svg.innerHTML = '';
+
+  /* 欄位抬頭 */
+  for (let d = 0; d <= MAXD; d++) {
+    const col = COLS[d] || { head: '深度 ' + d, sub: '' };
+    const t = el('text', { x: COLX(d) + 2, y: HEAD_Y, class: 'colhead' }); t.textContent = col.head || ('深度 ' + d);
+    const s = el('text', { x: COLX(d) + 2, y: HEAD_Y + 17, class: 'colsub' }); s.textContent = col.sub || '';
+    svg.appendChild(t); svg.appendChild(s);
+  }
+
+  const hot = selected ? new Set([selected, ...ancestors(selected), ...descendants(selected)]) : null;
+
+  /* 邊 */
+  NODES.forEach(n => n.deps.forEach(dp => {
+    const a = xy[dp], b = xy[n.id];
+    const p = el('path', { class: 'link', d: bez(a.x + NODEW, a.y + NODEH / 2, b.x, b.y + NODEH / 2) });
+    if (hot) { (hot.has(n.id) && hot.has(dp)) ? p.classList.add('hot') : p.classList.add('dim'); }
+    svg.appendChild(p);
+  }));
+
+  /* 節點 */
+  NODES.forEach(n => {
+    const { x, y } = xy[n.id];
+    const f = el('foreignObject', { x, y, width: NODEW, height: NODEH });
+    const wrap = document.createElement('div');
+    wrap.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+    wrap.className = 'node';
+    const unstable = isUnstable(n);
+    const depCount = n.deps.filter(d => !isRoot(BYID[d])).length;
+    const cnt = MODES[n.m].count && depCount >= 1 ? `<span class="cnt">${depCount}源</span>` : '';
+    const pre = unstable ? AVAIL.legend.mark + ' ' : '';
+    wrap.innerHTML = `<div class="pill p-${n.m}"${tipAttr(n.src)}><span class="nm">${pre}${n.label}</span>${cnt}</div>`;
+    const pill = wrap.firstChild;
+    if (hot) { hot.has(n.id) ? (selected === n.id && pill.classList.add('hot')) : pill.classList.add('dim'); }
+    wrap.addEventListener('click', e => { e.stopPropagation(); selectNode(n.id); });
+    f.appendChild(wrap); svg.appendChild(f);
+  });
+}
+
+/* ---- 選取邏輯 ----
+ * selectNode : 直接點節點 -> 焦點按鈕全部回彈
+ * 焦點按鈕    : 設 selected + activeBtn; 再按同一顆則取消
+ */
+function selectNode(id) {
+  selected = (selected === id) ? null : id;
+  activeBtn = null;
+  render(); syncButtons();
+}
+const focusBtns = [...document.querySelectorAll('.toolbar [data-node]')];
+function syncButtons() { focusBtns.forEach(b => b.classList.toggle('on', activeBtn === b.dataset.node)); }
+focusBtns.forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation();
+  if (activeBtn === b.dataset.node) { activeBtn = null; selected = null; }
+  else { activeBtn = b.dataset.node; selected = b.dataset.node; }
+  render(); syncButtons();
+}));
+svg.addEventListener('click', () => { if (selected) { selected = null; activeBtn = null; render(); syncButtons(); } });
+
+/* ---- 文案 / 底部說明 注入 ---- */
+function mount() {
+  document.title = D.meta.title;
+  document.getElementById('title').textContent = D.meta.title;
+  document.getElementById('subtitle').textContent = D.meta.subtitle;
+
+  /* 頂部色塊圖例 (按鈕最右邊): 模式色 + 常缺乏標記 */
+  document.getElementById('legend').innerHTML =
+    D.legendModes.map(k =>
+      `<div${tipAttr(MODES[k].desc)}><span class="dot" style="background:${modeColor(k)}"></span>${MODES[k].label}</div>`
+    ).join('') +
+    `<span class="sep"></span>` +
+    `<div>${AVAIL.legend.mark} ${AVAIL.legend.text}</div>`;
+
+  /* 底部: 使用說明條列 + 補充段落 */
+  const bullets = (D.meta.guide || []).map(x => `<li>${x}</li>`).join('');
+  const extra = (D.meta.extra || []).map(e => `<p><b>${e.h}:</b> ${e.t}</p>`).join('');
+
+  document.getElementById('footer').innerHTML =
+    `<p class="notes-h">怎麼看這張圖</p><ul class="notes-list">${bullets}</ul>${extra}`;
+}
+
+/* ---- 即時 tooltip: 滑到有 data-tip 的元素立刻顯示 ---- */
+const tip = document.getElementById('tip');
+document.addEventListener('mousemove', e => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (!t) { tip.style.display = 'none'; return; }
+  tip.textContent = t.dataset.tip;
+  tip.style.display = 'block';
+  const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + 'px';
+  tip.style.top = (e.clientY + 16) + 'px';
+});
+
+/* ---- 啟動 ---- */
+mount();
+render();
+
+})();
+</script>
+</body>
+</html>
