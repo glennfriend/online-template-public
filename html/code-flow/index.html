@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>多視角流程圖</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#fff; --ink:#1a1d21; --dim:#5b6470; --faint:#8d97a3;
+    --line:#d4d9e0; --line2:#aab3bf;
+    --hl:#0b64c4; --hl-bg:rgba(11,100,196,.10);
+    /* 視角配色盤 (views[].colors 只能用這幾個 token) */
+    --c-blue:#2f6fb0; --c-indigo:#1d4f8c; --c-purple:#7a5bb5; --c-teal:#1e8e94;
+    --c-green:#2c8a4f; --c-orange:#c2660c; --c-red:#c0392b; --c-pink:#b5417a; --c-gray:#8d97a3;
+    --warn-bg:rgba(194,102,12,.09); --warn-br:#c2660c;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 12px rgba(16,24,40,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#14171b; --panel:#1c2026; --ink:#e8ecf1; --dim:#a3adba; --faint:#75808d;
+      --line:#333a44; --line2:#4b5563;
+      --hl:#5aa2e0; --hl-bg:rgba(90,162,224,.14);
+      --c-blue:#5aa2e0; --c-indigo:#6fb0ea; --c-purple:#a98be0; --c-teal:#3fb8bf;
+      --c-green:#4fb877; --c-orange:#e8963a; --c-red:#e5695a; --c-pink:#e87aa8; --c-gray:#75808d;
+      --warn-bg:rgba(232,150,58,.11); --warn-br:#e8963a;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;
+    font-family:-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+  .page{max-width:1680px;margin:0 auto;padding:18px 20px 40px}
+  h1{margin:0 0 4px;font-size:20px;font-weight:650}
+  .sub-title{margin:0 0 16px;color:var(--dim);font-size:14px}
+  .src{margin-top:10px;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .src .kv{display:flex;gap:12px;line-height:1.75}
+  .src .k{min-width:152px;flex:none;color:var(--faint)}
+  .src .v{color:var(--dim)}
+
+  .bar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 9px}
+  .bar-t{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);
+    font-weight:650;min-width:66px}
+  .btns{display:flex;flex-wrap:wrap;gap:6px}
+  .bar button{font:inherit;font-size:13px;padding:5px 14px;border-radius:16px;cursor:pointer;
+    border:1px solid var(--line2);background:var(--panel);color:var(--dim);transition:all .12s}
+  .bar button:hover{border-color:var(--hl);color:var(--ink)}
+  .bar button.on{border-color:var(--hl);color:var(--hl);background:var(--hl-bg);font-weight:650}
+  .bar-sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
+
+  .key{display:flex;flex-wrap:wrap;align-items:center;gap:7px 16px;margin:0 0 10px;min-height:20px}
+  .key .k{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim)}
+  .key .k i{width:13px;height:13px;border-radius:3px;flex:none;border:1.6px solid}
+  .key .k b{color:var(--ink);font-weight:640}
+  .key .k.cap{color:var(--faint)}
+  .key .who{font-size:12.5px;color:var(--faint);font-style:normal}
+  /* hover 卡片時高亮對應那一項: 用 box-shadow 撐底色, 不佔空間所以不會擠動排版 */
+  .key .k.hot{background:var(--hl-bg);box-shadow:0 0 0 5px var(--hl-bg);border-radius:2px}
+  .key .k.hot b{color:var(--hl)}
+
+  .stage{overflow-x:auto;padding-bottom:6px;border:1px solid var(--line);border-radius:10px;
+    background:var(--panel)}
+  svg.map{display:block;height:auto}
+  svg.map.fit{width:100% !important;min-width:0}
+
+  section.blk{margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+  section.blk > h2{margin:0 0 3px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint)}
+  section.blk > .sub{font-size:12.5px;color:var(--dim);margin:0 0 13px}
+
+  .flows{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;align-items:start}
+  .flow{border:1px solid var(--line);border-radius:9px;padding:12px 14px;cursor:pointer;
+    background:var(--panel);transition:border-color .13s,background .13s}
+  .flow:hover{border-color:var(--line2)}
+  .flow.on{border-color:var(--hl);background:var(--hl-bg)}
+  .flow-hd{display:flex;align-items:center;gap:8px}
+  .flow-name{font-weight:650;font-size:15.5px;flex:1}
+  .flow-sum{font-size:13.5px;color:var(--dim);margin-top:5px}
+  .flow-body{display:none;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}
+  .flow.on .flow-body{display:block}
+  .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:4px}
+  .sig{font-size:13.5px;margin-bottom:11px}
+  .ki{font-size:13.5px;background:var(--hl-bg);border-left:2px solid var(--hl);padding:9px 11px;
+    border-radius:0 4px 4px 0;margin-bottom:11px}
+  .steps{list-style:none;margin:0;padding:0;font-size:13.5px;counter-reset:s}
+  .steps li{position:relative;padding-left:25px;margin-bottom:6px;color:var(--dim);counter-increment:s}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:2px;width:17px;height:17px;
+    border-radius:50%;background:var(--hl-bg);color:var(--hl);font-size:10.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center}
+  .steps li b{color:var(--ink);font-weight:640;display:block}
+  .tag{font-size:10.5px;padding:1.5px 7px;border-radius:20px;font-weight:650;white-space:nowrap}
+  .tag.good{background:rgba(44,138,79,.14);color:var(--c-green)}
+  .tag.warn{background:rgba(194,102,12,.14);color:var(--c-orange)}
+  .tag.bad{background:rgba(192,57,43,.13);color:var(--c-red)}
+  .tag.plain{background:var(--hl-bg);color:var(--hl)}
+
+  details.primer{border:1px solid var(--line);border-radius:10px;background:var(--panel);
+    padding:0 18px;box-shadow:var(--shadow)}
+  .primer summary{cursor:pointer;padding:14px 0;font-weight:650;font-size:15px;list-style:none;
+    display:flex;align-items:center;gap:8px}
+  .primer summary::-webkit-details-marker{display:none}
+  .primer summary::before{content:"\25B8";color:var(--hl);font-size:12px;transition:transform .15s}
+  .primer[open] summary::before{transform:rotate(90deg)}
+  .primer .body{padding:14px 0 18px;border-top:1px solid var(--line)}
+  .primer p{margin:0 0 11px;max-width:940px}
+  .primer .q{font-weight:650;margin:18px 0 5px;font-size:14px}
+  .primer .q:first-child{margin-top:0}
+  .primer .box{background:var(--warn-bg);border-left:3px solid var(--warn-br);padding:12px 15px;
+    border-radius:0 6px 6px 0;margin:13px 0;max-width:940px}
+  .primer .box p:last-child,.primer .box ul:last-child{margin-bottom:0}
+  .primer ul{margin:6px 0 11px;padding-left:20px;max-width:940px}
+  .primer li{margin-bottom:5px}
+
+  .foot{margin-top:18px}
+  .foot h2{margin:0 0 8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint)}
+  .oq ul{margin:0;padding-left:17px;font-size:12px;color:var(--dim)}
+  .oq li{margin-bottom:5px}
+
+  .band rect{fill:var(--ink);opacity:.045}
+  .band text{font-size:13.5px;fill:var(--faint);font-weight:650;letter-spacing:.03em}
+  .nd{cursor:default}
+  .nd rect.box{fill:var(--panel);stroke-width:1.8}
+  .nd text.ti{font-size:17.5px;font-weight:670;fill:var(--ink)}
+  .nd text.numt{font-size:13.5px;font-weight:700}
+  .slot text.sub{font-size:13px;font-weight:640}
+  .slot text.line{font-size:14.5px;fill:var(--dim)}
+  .edge path{fill:none;stroke:var(--line2);stroke-width:1.8}
+  .edge.gated path{stroke:var(--c-orange);stroke-width:2.4}
+  .edge.mutate path{stroke-dasharray:6 4}
+  .edge text{font-size:13.5px;fill:var(--dim)}
+  .edge text tspan{paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round}
+  .edge.side text,.edge.mutate text{opacity:0;transition:opacity .15s}
+  .edge.side:hover text,.edge.mutate:hover text{opacity:1}
+  .edge.side,.edge.mutate{pointer-events:stroke}
+  svg.map.filtered .nd{opacity:.16;transition:opacity .16s}
+  svg.map.filtered .edge{opacity:.1;transition:opacity .16s}
+  svg.map.filtered .nd.act,svg.map.filtered .edge.act{opacity:1}
+  svg.map.filtered .edge.act path{stroke:var(--hl);stroke-width:2.8}
+  svg.map.filtered .edge.act.gated path{stroke:var(--c-orange)}
+  svg.map.filtered .edge.act text{opacity:1}
+  svg.map.filtered .nd.act rect.box{filter:drop-shadow(0 2px 8px rgba(11,100,196,.3))}
+  .nd:hover rect.box{stroke-width:3}
+  /* 這個視角沒有值得寫的內容 -> 淡化, 讓注意力落在有內容的卡片上 */
+  .nd.muted{opacity:.34;transition:opacity .16s}
+  svg.map.filtered .nd.muted.act{opacity:.5}
+
+  #tip{position:fixed;z-index:60;max-width:440px;pointer-events:none;opacity:0;transition:opacity .1s;
+    background:var(--panel);color:var(--ink);border:1px solid var(--line2);border-radius:10px;
+    box-shadow:var(--shadow);padding:15px 17px;font-size:14.5px;line-height:1.6}
+  #tip .h{font-weight:670;font-size:17px}
+  #tip .sl{color:var(--faint);font-size:13px;margin-bottom:11px;font-family:ui-monospace,monospace}
+  #tip .sec{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:13px 0 3px}
+  #tip .why{background:var(--hl-bg);border-left:3px solid var(--hl);padding:10px 12px;
+    border-radius:0 5px 5px 0;margin-top:4px;font-size:14.5px}
+  #tip ul{margin:4px 0 0;padding-left:18px;color:var(--dim);font-size:13.5px}
+  #tip li{margin-bottom:5px}
+  #tip .ev{margin-top:11px;padding-top:9px;border-top:1px dashed var(--line);font-size:12px;
+    color:var(--faint);word-break:break-all}
+  #banner{margin:0 0 16px;padding:12px 16px;border:1px solid var(--c-red);border-radius:8px;color:var(--c-red);background:var(--panel)}
+  #banner ul{margin:6px 0 0;padding-left:20px;font-size:13px}
+  .mod-err{margin:8px 0;padding:8px 12px;border:1px dashed var(--c-red);border-radius:6px;color:var(--c-red);font-size:13px}
+</style>
+</head>
+<body>
+<div class="page">
+  <div id="banner" hidden></div>
+  <h1 id="ttl"></h1>
+  <p class="sub-title" id="subttl"></p>
+
+  <div class="bar">
+    <span class="bar-t" id="bar-view"></span>
+    <div class="btns" id="views"></div>
+    <span class="bar-sep"></span>
+    <span class="bar-t" id="bar-zoom"></span>
+    <div class="btns">
+      <button id="z-real" class="on"></button>
+      <button id="z-fit"></button>
+    </div>
+  </div>
+  <div class="key" id="key"></div>
+
+  <div class="stage" id="stage">
+    <svg class="map" id="map" role="img"></svg>
+  </div>
+
+  <section class="blk" id="flows-blk">
+    <h2 id="flows-h"></h2>
+    <p class="sub" id="flows-sub"></p>
+    <div class="flows" id="flows"></div>
+  </section>
+
+  <section class="blk" id="primer-blk">
+    <details class="primer" id="primer">
+      <summary id="primer-sum"></summary>
+      <div class="body" id="primer-body"></div>
+    </details>
+  </section>
+
+  <div class="foot">
+    <div class="oq" id="oq-blk"><h2 id="oq-h"></h2><ul id="oq"></ul></div>
+    <div class="oq" style="margin-top:22px"><h2>meta</h2><div class="src" id="src"></div></div>
+  </div>
+</div>
+<div id="tip"></div>
+<!-- 外部相依: 每個 <script> 標明它提供的全域變數 (data-global). 引擎一開始就檢查, 缺了就在頁面上列出檔案 -->
+<script src="data.js" data-global="CODEFLOW"></script>
+<script>
+(function(){
+'use strict';
+// ============ 1. 錯誤顯示 ============
+function showBanner(title,lines){
+  const box=document.getElementById('banner');
+  const h=document.createElement('strong'); h.textContent=title;
+  const ul=document.createElement('ul');
+  lines.forEach(t=>{const li=document.createElement('li'); li.textContent=t; ul.appendChild(li);});
+  box.append(h,ul); box.hidden=false;
+  console.error(title,lines);
+}
+// 區塊出錯時, 只在該區塊顯示錯誤, 其他區塊照常運作
+function guard(name,host,fn){
+  try{ fn(); }
+  catch(err){
+    console.error('['+name+']',err);
+    const box=document.createElement('div');
+    box.className='mod-err';
+    box.textContent=name+' 出錯: '+err.message+' (詳細內容見 console)';
+    host.parentNode.insertBefore(box,host);
+  }
+}
+
+// ============ 2. 外部相依 ============
+const missing=[...document.querySelectorAll('script[data-global]')].filter(s=>!window[s.dataset.global]);
+if(missing.length){
+  showBanner('缺少必要的檔案, 頁面無法運作. 請確認檔案和 index.html 放在同一個資料夾:',
+    missing.map(s=>s.dataset.global+' <- '+s.getAttribute('src')));
+  return;
+}
+
+// ============ 3. 資料檢查 ============
+// 重點在 "多視角一致性": 每個節點對每個視角都要明確表態 (有內容 / 明寫 null), 不容許漏掉.
+// 這張圖的各部分互相引用 (節點/連線/流程), 有錯就整張不畫, 一次列出全部錯誤.
+const PALETTE=['--c-blue','--c-indigo','--c-purple','--c-teal','--c-green','--c-orange','--c-red','--c-pink','--c-gray'];
+const TONES=['good','warn','bad','plain'];
+const KINDS=['main','side','gated','mutate'];
+function validate(D){
+  const E=[];
+  const str=v=>typeof v==='string'&&v!=='';
+  const obj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+  const arr=Array.isArray;
+  const dup=list=>list.filter((x,i)=>list.indexOf(x)!==i);
+  if(!obj(D)) return ['CODEFLOW 必須是物件'];
+
+  const meta=D.meta||{};
+  if(!str(meta.title)) E.push('缺 meta.title');
+  if(!str(meta.subtitle)) E.push('缺 meta.subtitle (一句話講清楚這張圖在解釋什麼)');
+  if(!arr(meta.meta_rows)||!meta.meta_rows.length) E.push('meta.meta_rows 必須是非空 array, 每筆 [key, value]');
+  else if(meta.meta_rows.some(r=>!arr(r)||r.length!==2||!str(r[0]))) E.push('meta.meta_rows 每筆必須是 [key, value] 兩個字串');
+
+  const vs=arr(D.views)?D.views:[];
+  if(vs.length<2) E.push('views 至少要 2 個視角 (多視角解釋是這張圖的重點)');
+  vs.forEach((v,i)=>{
+    const w='views['+i+'] '+(v.id||'');
+    ['id','label','cap','colorKey','who'].forEach(k=>{ if(!str(v[k])) E.push(w+': 缺 '+k+' (非空字串)'); });
+    if(!obj(v.labels)||!Object.keys(v.labels).length) E.push(w+': 需要非空的 labels 物件 (分類值 -> 說明文字)');
+    if(!obj(v.colors)) E.push(w+': 需要 colors 物件 (分類值 -> 色票 token)');
+    if(obj(v.labels)&&obj(v.colors)){
+      const a=Object.keys(v.labels).sort().join(), b=Object.keys(v.colors).sort().join();
+      if(a!==b) E.push(w+': labels 與 colors 必須是同一組 key');
+      Object.entries(v.colors).forEach(([k,c])=>{ if(!PALETTE.includes(c)) E.push(w+': colors.'+k+'='+c+' 不是內建色票 ('+PALETTE.join(' ')+')'); });
+    }
+    if('extra' in v&&(!obj(v.extra)||!str(v.extra.field)||!str(v.extra.title))) E.push(w+': extra 需要 field + title (hover 時追加顯示的節點欄位)');
+  });
+  dup(vs.map(v=>v.id)).forEach(id=>E.push('views 的 id 重複: '+id));
+
+  const ns=arr(D.nodes)?D.nodes:[];
+  if(!ns.length) E.push('nodes 必須是非空 array');
+  dup(ns.map(n=>n.id)).forEach(id=>E.push('nodes 的 id 重複: '+id));
+  ns.forEach((n,i)=>{
+    const w='nodes['+i+'] '+(n.id||'');
+    if(!str(n.id)||!str(n.title)||!str(n.row)||typeof n.col!=='number'||n.col<0) E.push(w+': 需要 id / title / row (字串) + col (>=0 的數字)');
+    if(!str(n.why)) E.push(w+': 需要 why (為什麼有這一步; hover 時顯示)');
+    if(!obj(n.m)){ E.push(w+': 需要 m 物件 (視角 id -> 卡片行陣列)'); return; }
+    vs.forEach(v=>{
+      if(!(v.id in n.m)){ E.push(w+': 沒對視角 '+v.id+' 表態 (沒內容就明寫 m.'+v.id+' = null)'); return; }
+      const rows=n.m[v.id];
+      if(rows!==null&&!arr(rows)){ E.push(w+': m.'+v.id+' 只能是 array 或 null'); return; }
+      const list=rows||[];
+      if(list.length>4) E.push(w+': m.'+v.id+' 最多 4 行 (第 1 行是分類, 其餘是說明), 超過會被卡片切掉');
+      if(list.some(x=>!str(x))) E.push(w+': m.'+v.id+' 每行都必須是非空字串');
+      const k=n[v.colorKey];
+      if(k!=null&&obj(v.labels)&&!(k in v.labels)) E.push(w+': '+v.colorKey+'='+k+' 不在視角 '+v.id+' 的 labels 裡');
+      if(list.length&&k==null) E.push(w+': 在視角 '+v.id+' 有內容卻沒有分類值 '+v.colorKey+' (顏色會失去意義)');
+    });
+    if(('facts' in n&&!arr(n.facts))||('ev' in n&&!arr(n.ev))) E.push(w+': facts / ev 必須是 array');
+  });
+  const nid=ns.map(n=>n.id);
+
+  const es=arr(D.edges)?D.edges:[];
+  if(!es.length) E.push('edges 必須是非空 array (節點之間怎麼走)');
+  dup(es.map(e=>e.id)).forEach(id=>E.push('edges 的 id 重複: '+id));
+  es.forEach((e,i)=>{
+    const w='edges['+i+'] '+(e.id||'');
+    if(!str(e.id)||!str(e.from)||!str(e.to)) E.push(w+': 需要 id / from / to');
+    else if(!nid.includes(e.from)||!nid.includes(e.to)) E.push(w+': 指到不存在的節點');
+    if(!KINDS.includes(e.kind)) E.push(w+': kind 只能是 '+KINDS.join(' / '));
+  });
+  const eid=es.map(e=>e.id);
+
+  const tags=D.flowTags||{};
+  Object.entries(tags).forEach(([k,t])=>{ if(!obj(t)||!str(t.label)||!TONES.includes(t.tone)) E.push('flowTags.'+k+': 需要 label + tone ('+TONES.join(' / ')+')'); });
+  (arr(D.flows)?D.flows:[]).forEach((f,i)=>{
+    const w='flows['+i+'] '+(f.id||'');
+    if(!str(f.id)||!str(f.name)||!str(f.summary)) E.push(w+': 需要 id / name / summary');
+    if(f.mode==='set'){ if(!arr(f.nodes)||!f.nodes.length) E.push(w+': mode=set 需要非空 nodes'); }
+    else if(!arr(f.steps)||f.steps.length<2) E.push(w+': steps 至少要 2 個節點 id (順序就是走法)');
+    [...(f.steps||[]),...(f.nodes||[])].filter(id=>!nid.includes(id)).forEach(id=>E.push(w+': 指到不存在的節點 '+id));
+    (f.branch||[]).filter(id=>!eid.includes(id)).forEach(id=>E.push(w+': branch 指到不存在的 edge '+id));
+    if('status' in f&&!(f.status in tags)) E.push(w+': status 必須是 flowTags 裡定義過的 key');
+  });
+
+  const nrows=[...new Set(ns.map(n=>n.row))];
+  if(D.layout&&D.layout.rows) nrows.filter(r=>!(r in D.layout.rows)).forEach(r=>E.push('節點的 row 不在 layout.rows 裡: '+r));
+  (D.bands||[]).forEach((b,i)=>{
+    if(!arr(b.rows)||!b.rows.length||!str(b.label)) E.push('bands['+i+']: 需要非空 rows + label');
+    else b.rows.filter(r=>!nrows.includes(r)).forEach(r=>E.push('bands['+i+']: rows 指到沒有節點的軌 '+r));
+  });
+
+  if('openQuestions' in D&&!arr(D.openQuestions)) E.push('openQuestions 必須是 array (沒查證的一律列在這)');
+  else if((D.openQuestions||[]).some(q=>!str(q))) E.push('openQuestions 每筆必須是非空字串');
+  if(D.primer!=null){
+    if(!arr(D.primer.blocks)) E.push('primer 需要 blocks array');
+    else D.primer.blocks.forEach((b,i)=>{ if(!str(b.q)&&!(b.p||[]).length&&!(b.ul||[]).length) E.push('primer.blocks['+i+']: 至少要有 q / p / ul 其中之一'); });
+  }
+  return E;
+}
+
+const D=window.CODEFLOW;
+const errors=validate(D);
+if(errors.length){ showBanner('data.js 的資料有錯, 圖無法畫出來 (請修改 data.js):',errors); return; }
+
+// ============ 4. 畫圖 ============
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const map=document.getElementById('map'), tip=document.getElementById('tip'), stage=document.getElementById('stage');
+const keyEl=document.getElementById('key');
+const esc=s=>String(s);
+
+// 區塊標題全部可由資料層覆蓋, 結構層只留預設值
+const T=Object.assign({
+  bar_view:'卡片內容', bar_zoom:'顯示大小', z_real:'實際大小', z_fit:'符合寬度',
+  flows_h:'流程', flows_sub:'點一條流程, 上方圖裡只留它的路徑; 再點一次取消',
+  oq_h:'尚未查證',
+  tip_why:'為什麼', tip_facts:'查證到的事實', tip_source:'來源',
+  flow_signal:'出事會怎樣', flow_signal_set:'怎麼看這組',
+  flow_steps:'順序', flow_steps_set:'涵蓋的節點'
+}, D.labels||{});
+
+// ── layout: 資料層可只寫 col / row, 缺的部分由節點內容推算 ──
+const L=Object.assign({W:280,GAP:44,X0:24},D.layout||{});
+if(!L.COLS) L.COLS=Math.max(...D.nodes.map(n=>n.col))+1;
+if(!L.rows){
+  const order=[]; D.nodes.forEach(n=>{ if(order.indexOf(n.row)<0) order.push(n.row); });
+  L.rows={}; let y=8;
+  order.forEach(k=>{
+    // 卡片高度吃該軌最多行的視角 -> 內容多的軌自動長高, 不會被切掉
+    const lines=D.nodes.filter(n=>n.row===k)
+      .map(n=>Math.max(2,...D.views.map(v=>((n.m||{})[v.id]||[]).length)));
+    const h=Math.max(124, 91+(Math.max(2,...lines)-2)*21+12);
+    L.rows[k]={y,h}; y+=h+64;
+  });
+}
+const COL=i=>L.X0+i*(L.W+L.GAP);
+D.nodes.forEach(n=>{
+  const r=L.rows[n.row];
+  if(!r) throw new Error('節點 '+n.id+' 的 row="'+n.row+'" 不在 layout.rows 裡');
+  n.x=COL(n.col); n.y=r.y; n.w=L.W; n.h=r.h;
+});
+const CANVAS_W=COL(L.COLS-1)+L.W+L.X0;
+const CANVAS_BOT=Math.max(...Object.keys(L.rows).map(k=>L.rows[k].y+L.rows[k].h));
+map.setAttribute('viewBox','0 -34 '+CANVAS_W+' '+(CANVAS_BOT+56));
+map.style.width=CANVAS_W+'px';
+
+const byId={}; D.nodes.forEach(n=>byId[n.id]=n);
+const pair={}; D.edges.forEach(e=>pair[e.from+'>'+e.to]=e.id);
+const VIEW={}; D.views.forEach(v=>VIEW[v.id]=v);
+let curView=D.views[0].id;
+
+document.title=D.meta.title;
+document.getElementById('ttl').textContent=D.meta.title;
+document.getElementById('subttl').textContent=D.meta.subtitle||'';
+map.setAttribute('aria-label',D.meta.title);
+document.getElementById('bar-view').textContent=T.bar_view;
+document.getElementById('bar-zoom').textContent=T.bar_zoom;
+document.getElementById('z-real').textContent=T.z_real;
+document.getElementById('z-fit').textContent=T.z_fit;
+document.getElementById('flows-h').textContent=T.flows_h;
+document.getElementById('flows-sub').textContent=T.flows_sub;
+document.getElementById('oq-h').textContent=T.oq_h;
+// 這一區是拿來對照 / check 的, 所以用 key value 硬性列出, 不寫成描述句
+document.getElementById('src').innerHTML=
+  (D.meta.meta_rows||[]).map(r=>'<div class="kv"><span class="k">'+esc(r[0])+'</span><span class="v">'+esc(r[1])+'</span></div>').join('');
+
+// 該視角下這個節點屬於哪一個值; null = 這個視角沒有值得寫的東西 -> 卡片會淡化
+const keyOf=(n,v)=>n[v.colorKey]==null?null:n[v.colorKey];
+const colOf=(n,v)=>{const k=keyOf(n,v); return k&&v.colors[k]?'var('+v.colors[k]+')':'var(--line2)';};
+
+// ── 箭頭 (fill 跟著線色走) ──
+const defs=el('defs',{});
+const mk=el('marker',{id:'ar',viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'5.5',
+  markerHeight:'5.5',orient:'auto-start-reverse'});
+mk.appendChild(el('path',{d:'M 0 0 L 10 5 L 0 10 z',fill:'context-stroke'}));
+defs.appendChild(mk); map.appendChild(defs);
+
+// ── 背景帶: 主線與旁支視覺分開, 免得旁支被讀成流程的一步 ──
+// 涵蓋哪幾軌由資料層的 rows 指定; label 裡的 {n} 換成該帶實際的節點數
+const BANDS=(D.bands||[]).map(b=>{
+  const rs=b.rows.map(k=>L.rows[k]);
+  const top=Math.min(...rs.map(r=>r.y)), bot=Math.max(...rs.map(r=>r.y+r.h));
+  return Object.assign({},b,{
+    y:top-16, h:bot-top+32,
+    w:(b.toCol!=null?COL(b.toCol)+L.W+L.X0:CANVAS_W),
+    t:b.label.replace('{n}',D.nodes.filter(n=>b.rows.indexOf(n.row)>=0).length),
+  });
+});
+const bandG=el('g',{}); map.appendChild(bandG);
+BANDS.forEach(b=>{
+  const g=el('g',{class:'band'});
+  g.appendChild(el('rect',{x:0,y:b.y,width:b.w,height:b.h,rx:9}));
+  const t=el('text',{x:6,y:b.y-8}); t.textContent=b.t;
+  if(b.full){const ti=el('title',{}); ti.textContent=b.full; t.appendChild(ti);}
+  g.appendChild(t); bandG.appendChild(g);
+});
+
+// ── 連接線 (先畫 -> 壓在節點下) ──
+const edgeG=el('g',{}); map.appendChild(edgeG);
+const edgeEls={}, edgeTexts=[];
+D.edges.forEach(e=>{
+  const a=byId[e.from], b=byId[e.to];
+  let d,lx,ly;
+  if(Math.abs(a.y-b.y)<12){                        // 同軌 -> 水平 S 曲線
+    const right=b.x>a.x;
+    const x1=right?a.x+a.w:a.x, y1=a.y+a.h/2, x2=right?b.x:b.x+b.w, y2=b.y+b.h/2, dx=(x2-x1)*.5;
+    d='M '+x1+' '+y1+' C '+(x1+dx)+' '+y1+' '+(x2-dx)+' '+y2+' '+x2+' '+y2;
+    lx=(x1+x2)/2; ly=a.y-11;                       // 同軌間隙比文字窄 -> 移到節點上緣之上
+  }else{                                           // 跨軌 -> 垂直 S 曲線
+    const down=b.y>a.y;
+    const x1=a.x+a.w/2, y1=down?a.y+a.h:a.y, x2=b.x+b.w/2, y2=down?b.y:b.y+b.h, dy=(y2-y1)*.45;
+    d='M '+x1+' '+y1+' C '+x1+' '+(y1+dy)+' '+x2+' '+(y2-dy)+' '+x2+' '+y2;
+    // 往下看終點上緣, 往上看起點上緣 — 都落在層間空白帶; x 偏起點側避免兩條斜線算出同一中點
+    lx=x1+(x2-x1)*.35; ly=down?y2-11:a.y-11;
+  }
+  const g=el('g',{class:'edge '+(e.kind||'main'),'data-id':e.id});
+  g.appendChild(el('path',{d,'marker-end':'url(#ar)'}));
+  const t=el('text',{x:lx,y:ly,'text-anchor':'middle'});
+  const s=el('tspan',{}); s.textContent=e.label||''; t.appendChild(s); g.appendChild(t);
+  edgeG.appendChild(g); edgeEls[e.id]=g; if(e.label) edgeTexts.push(t);
+});
+
+// ── hover 卡片的深層內容; 某視角要追加的欄位由 views[].extra 指定 ──
+const hotKey=k=>keyEl.querySelectorAll('.k[data-k]').forEach(e=>e.classList.toggle('hot',e.dataset.k===k));
+// 第一個視角當「預設摘要來源」-> 結構層不寫死任何視角 id
+const V0=D.views[0];
+const mOf=(n,vid)=>((n.m||{})[vid])||[];
+const subLine=n=>[V0.labels[keyOf(n,V0)],mOf(n,V0.id)[0]]
+  .filter((x,i,a)=>x&&a.indexOf(x)===i).join(' · ');
+const tipHtml=n=>{
+  const ex=VIEW[curView].extra;
+  return '<div class="h">'+(n.num?n.num+'. ':'')+n.title+'</div>'+
+    '<div class="sl">'+subLine(n)+'</div>'+
+    (n.why?'<div class="sec">'+T.tip_why+'</div><div class="why">'+n.why+'</div>':'')+
+    ((n.facts||[]).length?'<div class="sec">'+T.tip_facts+'</div><ul>'+n.facts.map(f=>'<li>'+f+'</li>').join('')+'</ul>':'')+
+    (ex&&(n[ex.field]||[]).length?'<div class="sec">'+ex.title+'</div><ul>'+n[ex.field].map(f=>'<li>'+f+'</li>').join('')+'</ul>':'')+
+    ((n.ev||[]).length?'<div class="ev">'+T.tip_source+': '+n.ev.join(' · ')+'</div>':'');
+};
+
+// ── 節點 ──
+const nodeG=el('g',{}); map.appendChild(nodeG);
+const nodeEls={}, slots=[];
+D.nodes.forEach(n=>{
+  const g=el('g',{class:'nd','data-id':n.id,tabindex:'0'});
+  const box=el('rect',{class:'box',x:n.x,y:n.y,width:n.w,height:n.h,rx:9});
+  const bar=el('rect',{x:n.x,y:n.y,width:6,height:n.h,rx:3});
+  g.appendChild(box); g.appendChild(bar);
+  let tx=n.x+20;
+  if(n.num){                                       // 主線才有編號 -> 先後順序一眼可見
+    g.appendChild(el('circle',{cx:n.x+27,cy:n.y+30,r:15,fill:'var(--hl-bg)',stroke:'var(--hl)','stroke-width':1.6}));
+    const nt=el('text',{class:'numt',x:n.x+27,y:n.y+35,'text-anchor':'middle',fill:'var(--hl)'});
+    nt.textContent=n.num; g.appendChild(nt); tx=n.x+52;
+  }
+  const ti=el('text',{class:'ti',x:tx,y:n.y+37}); ti.textContent=n.title; g.appendChild(ti);
+  const sg=el('g',{class:'slot'}); g.appendChild(sg);
+  slots.push({g:sg,n,box,bar});
+  nodeG.appendChild(g); nodeEls[n.id]=g;
+
+  const place=ev=>{
+    const p=14,r=tip.getBoundingClientRect();
+    let x=ev.clientX+p, y=ev.clientY+p;
+    if(x+r.width>innerWidth-8) x=ev.clientX-r.width-p;
+    if(y+r.height>innerHeight-8) y=Math.max(8,ev.clientY-r.height-p);
+    tip.style.left=x+'px'; tip.style.top=y+'px';
+  };
+  const show=ev=>{tip.innerHTML=tipHtml(n); tip.style.opacity=1; place(ev); hotKey(keyOf(n,VIEW[curView]));};
+  const hide=()=>{tip.style.opacity=0; hotKey(null);};
+  g.addEventListener('mouseenter',show);
+  g.addEventListener('mousemove',place);
+  g.addEventListener('mouseleave',hide);
+  g.addEventListener('focus',()=>{const r=g.getBoundingClientRect();show({clientX:r.left+r.width/2,clientY:r.bottom});});
+  g.addEventListener('blur',hide);
+});
+
+// ── label 防撞: 幾何算不出文字寬度, 等 DOM 有了才能量 bbox; 節點先排隊 -> 文字永遠讓節點 ──
+(function(){
+  const ol=(a,b)=>!(a.x+a.width<=b.x||b.x+b.width<=a.x||a.y+a.height<=b.y||b.y+b.height<=a.y);
+  const pad=(r,d)=>({x:r.x-d,y:r.y-d,width:r.width+2*d,height:r.height+2*d});
+  const placed=D.nodes.map(n=>({x:n.x,y:n.y,width:n.w,height:n.h}));
+  document.querySelectorAll('.band text').forEach(t=>placed.push(pad(t.getBBox(),1)));
+  // 上下左右都試: 長斜線常卡在兩排節點之間, 只垂直推會把文字推進節點裡
+  const TRY=[[0,0],[0,-16],[0,16],[0,-32],[0,32],[-70,0],[70,0],[-140,0],[140,0],[-70,-16],[70,-16]];
+  edgeTexts.forEach(t=>{
+    const x0=parseFloat(t.getAttribute('x')), y0=parseFloat(t.getAttribute('y'));
+    let b;
+    for(let i=0;i<TRY.length;i++){
+      t.setAttribute('x',x0+TRY[i][0]); t.setAttribute('y',y0+TRY[i][1]);
+      b=pad(t.getBBox(),1);
+      if(!placed.some(p=>ol(b,p))) break;
+    }
+    placed.push(b);
+  });
+})();
+
+// ── 視角切換: 標題與位置不動, 內容與顏色整批換 ──
+const paintView=id=>{
+  curView=id;
+  const v=VIEW[id];
+  slots.forEach(function(s){
+    const g=s.g, n=s.n;
+    while(g.firstChild) g.removeChild(g.firstChild);
+    const c=colOf(n,v);
+    s.box.setAttribute('stroke',c); s.bar.setAttribute('fill',c);
+    // 這個視角對這張卡沒有值得寫的內容 -> 淡化並只留標題, 不填任何佔位文字
+    const rows=mOf(n,id);
+    nodeEls[n.id].classList.toggle('muted', !rows.length);
+    if(!rows.length) return;
+    const sub=el('text',{class:'sub',x:n.x+20,y:n.y+65,fill:c});
+    sub.textContent=rows[0]; g.appendChild(sub);
+    rows.slice(1).forEach((line,i)=>{
+      if(!line) return;
+      const t=el('text',{class:'line',x:n.x+20,y:n.y+91+i*21}); t.textContent=line; g.appendChild(t);
+    });
+  });
+  // 顏色說明只列圖上真的出現的值, 免得出現查無此色的項目
+  const order=Object.keys(v.labels);
+  const used=[];
+  D.nodes.forEach(n=>{const k=keyOf(n,v); if(k&&v.labels[k]&&used.indexOf(k)<0) used.push(k);});
+  used.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  keyEl.innerHTML='<span class="k cap">'+(v.cap||'')+'</span>'+
+    used.map(k=>'<span class="k" data-k="'+k+'"><i style="border-color:var('+v.colors[k]+');'+
+      'background:var('+v.colors[k]+')"></i><b>'+v.labels[k]+'</b></span>').join('')+
+    '<span class="who">'+(v.who||'')+'</span>';
+  document.querySelectorAll('#views button').forEach(b=>b.classList.toggle('on',b.dataset.view===id));
+};
+const vb=document.getElementById('views');
+D.views.forEach((v,i)=>{
+  const b=document.createElement('button');
+  b.dataset.view=v.id;
+  b.textContent=v.label;
+  b.title=v.label+(v.who?' — '+v.who:'')+'  (快捷鍵 '+(i+1)+')';   // 數字鍵是隱藏功能, 按鈕上不顯示
+  b.addEventListener('click',()=>paintView(v.id));
+  vb.appendChild(b);
+});
+// 數字鍵直接切視角; 有輸入焦點時不搶鍵
+addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const t=e.target;
+  if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  const i=parseInt(e.key,10);
+  if(i>=1&&i<=D.views.length){ paintView(D.views[i-1].id); e.preventDefault(); }
+});
+
+// ── 流程卡片 (在圖下方, 點了高亮上方的圖) ──
+guard('流程',document.getElementById('flows'),()=>{
+const flowsEl=document.getElementById('flows');
+const TAG=D.flowTags||{};   // 標籤與色調由資料層定義, 結構層不預設任何語意
+let active=null;
+const clearHl=()=>{
+  map.classList.remove('filtered');
+  Object.keys(nodeEls).forEach(k=>nodeEls[k].classList.remove('act'));
+  Object.keys(edgeEls).forEach(k=>edgeEls[k].classList.remove('act'));
+  flowsEl.querySelectorAll('.flow').forEach(c=>c.classList.remove('on'));
+  active=null;
+};
+const applyFlow=(f,card)=>{
+  clearHl(); active=f.id; card.classList.add('on'); map.classList.add('filtered');
+  const list=f.mode==='set'?f.nodes:f.steps;
+  const nids={}; list.forEach(id=>nids[id]=1);
+  if(f.mode!=='set'){
+    const eids=[];
+    for(let i=0;i<f.steps.length-1;i++){const id=pair[f.steps[i]+'>'+f.steps[i+1]]; if(id) eids.push(id);}
+    (f.branch||[]).forEach(id=>eids.push(id));
+    eids.forEach(id=>{
+      if(!edgeEls[id]) return;
+      edgeEls[id].classList.add('act');
+      const e=D.edges.filter(x=>x.id===id)[0]; nids[e.from]=1; nids[e.to]=1;
+    });
+  }
+  Object.keys(nids).forEach(id=>{ if(nodeEls[id]) nodeEls[id].classList.add('act'); });
+  map.scrollIntoView({behavior:'smooth',block:'start'});
+  // 圖比螢幕寬 -> 順便橫向捲到這條流程的起點
+  const first=byId[list[0]];
+  if(first){
+    const sc=map.getBoundingClientRect().width/map.viewBox.baseVal.width;
+    stage.scrollTo({left:Math.max(0,first.x*sc-48),behavior:'smooth'});
+  }
+};
+(D.flows||[]).forEach(f=>{
+  const list=f.mode==='set'?f.nodes:f.steps;
+  const card=document.createElement('div');
+  card.className='flow';
+  card.innerHTML=
+    '<div class="flow-hd"><span class="flow-name">'+f.name+'</span>'+
+    (TAG[f.status]?'<span class="tag '+TAG[f.status].tone+'">'+TAG[f.status].label+'</span>':'')+'</div>'+
+    '<div class="flow-sum">'+(f.summary||'')+'</div>'+
+    '<div class="flow-body">'+
+      (f.insight?'<div class="ki">'+f.insight+'</div>':'')+
+      (f.signal?'<div class="lbl">'+(f.mode==='set'?T.flow_signal_set:T.flow_signal)+'</div><div class="sig">'+f.signal+'</div>':'')+
+      '<div class="lbl">'+(f.mode==='set'?T.flow_steps_set:T.flow_steps)+'</div>'+
+      '<ol class="steps">'+list.map(s=>
+        '<li><b>'+byId[s].title+'</b>'+mOf(byId[s],V0.id).slice(1).filter(Boolean).join(' ')+'</li>').join('')+'</ol>'+
+    '</div>';
+  card.addEventListener('click',()=>{active===f.id?clearHl():applyFlow(f,card);});
+  flowsEl.appendChild(card);
+});
+if(!(D.flows||[]).length) document.getElementById('flows-blk').style.display='none';
+map.addEventListener('click',e=>{if(e.target===map) clearHl();});
+
+});
+// ── 導讀 (primer): 為什麼要這樣讀這張圖 ──
+guard('導讀',document.getElementById('primer'),()=>{
+const P=D.primer;
+if(P&&(P.blocks||[]).length){
+  document.getElementById('primer-sum').textContent=P.title||'這張圖是什麼';
+  if(P.open) document.getElementById('primer').setAttribute('open','');
+  document.getElementById('primer-body').innerHTML=(P.blocks||[]).map(b=>{
+    const inner=o=>((o.p||[]).map(x=>'<p>'+x+'</p>').join('')+
+      ((o.ul||[]).length?'<ul>'+o.ul.map(x=>'<li>'+x+'</li>').join('')+'</ul>':''));
+    return (b.q?'<div class="q">'+b.q+'</div>':'')+inner(b)+
+      (b.box?'<div class="box">'+(b.box.title?'<b>'+b.box.title+'</b>':'')+inner(b.box)+'</div>':'');
+  }).join('');
+}else{
+  document.getElementById('primer-blk').style.display='none';
+}
+
+});
+guard('尚未查證',document.getElementById('oq'),()=>{
+const oq=document.getElementById('oq');
+(D.openQuestions||[]).forEach(q=>{const li=document.createElement('li');li.textContent=q;oq.appendChild(li);});
+if(!(D.openQuestions||[]).length) document.getElementById('oq-blk').style.display='none';
+
+});
+// ── 縮放: 實際大小 (字級照設計值, 需橫捲) / 符合寬度 (一眼看完, 字變小) ──
+const zReal=document.getElementById('z-real'), zFit=document.getElementById('z-fit');
+const setZoom=fit=>{
+  map.classList.toggle('fit',fit);
+  zFit.classList.toggle('on',fit); zReal.classList.toggle('on',!fit);
+  if(!fit) stage.scrollTo({left:0});
+};
+zReal.addEventListener('click',()=>setZoom(false));
+zFit.addEventListener('click',()=>setZoom(true));
+
+paintView(D.views[0].id);
+})();
+</script>
+</body>
+</html>
