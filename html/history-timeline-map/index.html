@@ -66,7 +66,8 @@ a { color: var(--steady); }
 .mapbox { grid-area: map; background: var(--sea); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; position: relative; min-height: 300px; }
 .mapbox svg { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
 .map-year { z-index: 1; position: absolute; top: 8px; right: 12px; font-family: var(--font-data); font-size: 22px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--panel) 85%, transparent); padding: 0 8px; border-radius: 4px; }
-.map-tools { z-index: 1; position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.map-tools { z-index: 1; position: absolute; top: 10px; left: 10px; display: grid; gap: 6px; justify-items: start; }
+.tool-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .map-tools button, .nav button { font: 500 13px var(--font-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
 .map-tools button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
 .map-zoom { z-index: 1; position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
@@ -155,7 +156,10 @@ footer ul ul { margin-top: 4px; }
 
   <section class="dash" aria-label="地圖與時間軸">
     <div class="mapbox" id="mapbox">
-      <div class="map-tools" id="views" role="group" aria-label="地圖範圍"></div>
+      <div class="map-tools">
+        <div class="tool-row" id="views" role="group" aria-label="地圖範圍"></div>
+        <div class="tool-row" id="map-layers" role="group" aria-label="地圖圖層"></div>
+      </div>
       <div class="map-year mono" id="map-year"></div>
       <svg id="map" role="img" aria-label="地圖"></svg>
       <div class="map-tip" id="map-tip" hidden></div>
@@ -182,7 +186,7 @@ footer ul ul { margin-top: 4px; }
         <div class="polities" id="polities"></div>
         <p class="small" id="bar-note"></p>
       </div>
-      <div class="card evcard" id="evcard" aria-live="polite" title="鍵盤: ← → 上一則/下一則, 1-9 跳到第 1-9 則, 0 跳到最後一則">
+      <div class="card evcard" id="evcard" aria-live="polite" title="鍵盤: ← → 上一則/下一則, Home 第一則, End 最後一則, 輸入數字跳到第幾則">
         <div class="ev-stack" id="ev-stack"></div>
         <div class="nav">
           <button type="button" id="prev">← 上一則</button>
@@ -204,13 +208,15 @@ footer ul ul { margin-top: 4px; }
     <ul>
       <li>拖動地圖下方時間軸上的紅線, 地圖會顯示那一年各政權大約的統治範圍.</li>
       <li>點時間軸上的事件, 地圖會標出事件發生的地點.</li>
+      <li>地圖左上第二排的按鈕切換圖層, 例如只看事件相關的政權, 或看當年所有政權的範圍.</li>
       <li>在地圖上滾動滑鼠滾輪可以放大縮小, 按住拖曳可以移動.</li>
       <li>地圖上沒寫名稱的點, 滑鼠移上去 (手機用點的) 會顯示名稱.</li>
       <li>在頁面上任何地方都可以用鍵盤換事件:
         <ul>
           <li>← → 切換上一則 / 下一則</li>
-          <li>數字 1-9 跳到第 1-9 則</li>
-          <li>0 跳到最後一則</li>
+          <li>Home 跳到第一則, End 跳到最後一則</li>
+          <li>輸入數字跳到第幾則, 例如按 1 再按 2 跳到第 12 則 (會先到第 1 則, 再換到第 12 則)</li>
+          <li>單獨按 0 也是跳到第一則</li>
         </ul>
       </li>
     </ul>
@@ -242,7 +248,7 @@ footer ul ul { margin-top: 4px; }
   }
   // 模組出錯時, 只在該模組的區塊顯示錯誤, 其他模組照常運作
   function guard(mod, fn) {
-    const old = mod.el.querySelector(":scope > .mod-err");
+    const old = [...mod.el.querySelectorAll(":scope > .mod-err")].find(e => e.dataset.mod === mod.name);
     try {
       fn();
       if (old) old.remove();
@@ -250,6 +256,7 @@ footer ul ul { margin-top: 4px; }
       console.error("[" + mod.name + "]", err);
       const box = old || mod.el.appendChild(document.createElement("div"));
       box.className = "mod-err";
+      box.dataset.mod = mod.name;
       box.textContent = mod.name + " 出錯: " + err.message + " (詳細內容見 console)";
     }
   }
@@ -309,13 +316,16 @@ footer ul ul { margin-top: 4px; }
     });
     const pol = Object.fromEntries(polities.map(p => [p.id, p]));
 
+    const layers = H.layers.filter(l => { const ok = !!LAYERS[l.id]; if (!ok) errors.push("圖層 " + JSON.stringify(l.id) + " 不存在, 可用的圖層: " + Object.keys(LAYERS).join(", ")); return ok; });
+
     const events = [];
     H.events.forEach((e, i) => {
       const where = "事件 " + (i + 1) + " (" + e.t + ")";
       const y = date(e.date, where + " date");
-      const bad = e.places.filter(id => !places[id]);
+      const bad = e.places.filter(id => !places[id]), badInv = (e.involves || []).filter(id => !pol[id]);
       if (y == null) return;
       if (!pol[e.p]) errors.push(where + ": 政權 p = " + JSON.stringify(e.p) + " 不在 polities 裡");
+      else if (badInv.length) errors.push(where + ": involves 裡的政權 " + badInv.join(", ") + " 不在 polities 裡");
       else if (bad.length) errors.push(where + ": 找不到地點 " + bad.join(", "));
       else if (y < range[0] || y > range[1]) errors.push(where + ": 日期不在時間軸範圍 range 內");
       else events.push({ ...e, y });
@@ -328,7 +338,7 @@ footer ul ul { margin-top: 4px; }
     eras.forEach((e, i) => { e.start = i === 0 ? range[0] : pol[e.polity].start; });
     eras.forEach((e, i) => { e.end = i + 1 < eras.length ? eras[i + 1].start : range[1]; });
 
-    return { errors, model: { ...H, range, kind, places, polities, pol, events, eras } };
+    return { errors, model: { ...H, range, kind, places, polities, pol, events, eras, layers } };
   }
 
   // 政權在某一年的控制比例 (到 end 時降為 0) 與狀態
@@ -380,6 +390,23 @@ footer ul ul { margin-top: 4px; }
     return out;
   }
 
+  // ============ 4b. 地圖圖層 ============
+  // 每個圖層一個 draw(ctx), 決定地圖上 "畫什麼". 新的呈現方式 (例如行進路線) 就在這裡加一個圖層, data.js 的 layers 開啟它.
+  // ctx: { g = 這個圖層專用的 <g>, path, proj, year, event = 目前的事件, drawn = 已畫過的政權 (避免同一政權疊兩層色), labels = 要參加排版的名稱 }
+  function drawAreas(ctx, polities) {   // 畫政權的統治範圍色塊 (同一政權的多個圓合成一塊) 與政權名稱
+    const list = polities.filter(p => !ctx.drawn.has(p.id)).map(p => ({ p, areas: areasAt(p, ctx.year) })).filter(d => d.areas.length);
+    list.forEach(d => ctx.drawn.add(d.p.id));
+    ctx.g.selectAll("path").data(list, d => d.p.id).join("path").attr("class", "polity")
+      .style("fill", d => pcol(d.p.id)).style("stroke", d => pcol(d.p.id))
+      .attr("d", d => ctx.path({ type: "MultiPolygon", coordinates: d.areas.map(a => d3.geoCircle().center(a.c).radius(a.r / 111.2)().coordinates) }));
+    list.forEach(({ p, areas }) => ctx.labels.push({ key: "p:" + p.id, text: p.name, kind: "polity", cls: "polity-label", color: pcol(p.id),
+      at: ctx.proj(p.labelAt || areas.reduce((a, b) => (b.r > a.r ? b : a)).c), rank: M.kind.polity.rank, must: true, cand: CAND_AREA }));
+  }
+  const LAYERS = {
+    focus: { draw: ctx => drawAreas(ctx, [ctx.event.p, ...(ctx.event.involves || [])].map(id => M.pol[id])) },   // 事件焦點: 事件相關的政權
+    territory: { draw: ctx => drawAreas(ctx, M.polities) }                                                     // 統治範圍: 當年所有政權
+  };
+
   // ============ 5. 狀態與動作 (模組之間只透過這裡溝通) ============
   let M;
   try {
@@ -393,8 +420,11 @@ footer ul ul { margin-top: 4px; }
   }
   if (!M.events.length) { showBanner("沒有可以顯示的事件", ["請檢查 data.js 的 events"]); return; }
 
-  const state = { year: M.events[0].y, sel: 0, view: M.map.views[0].id, hidden: new Set() };
+  const state = { year: M.events[0].y, sel: 0, view: M.map.views[0].id, hidden: new Set(), layers: new Set(M.layers.filter(l => l.on).map(l => l.id)) };
   const yearText = () => "西元 " + Math.floor(state.year) + " 年";
+  // 鍵盤輸入中的則數 (只有鍵盤用). 任何換事件的操作都會清掉, 避免之後按的數字被接到舊的輸入後面
+  let typed = "", typeTimer = null;
+  const cancelTyping = () => { clearTimeout(typeTimer); typed = ""; };
   const modules = [];
   const render = () => modules.forEach(m => guard(m, m.update));
 
@@ -405,11 +435,13 @@ footer ul ul { margin-top: 4px; }
   }
   const actions = {
     select(i) {
+      cancelTyping();
       state.sel = Math.max(0, Math.min(M.events.length - 1, i));
       state.year = M.events[state.sel].y;
       fitView(); render();
     },
     setYear(y) {   // 換年份, 並選最接近的事件
+      cancelTyping();
       state.year = Math.max(M.range[0], Math.min(M.range[1], y));
       let best = 0;
       M.events.forEach((e, i) => { if (Math.abs(e.y - state.year) < Math.abs(M.events[best].y - state.year)) best = i; });
@@ -417,7 +449,8 @@ footer ul ul { margin-top: 4px; }
       fitView(); render();
     },
     setView(v) { state.view = v; render(); },
-    toggleKind(k) { if (state.hidden.has(k)) state.hidden.delete(k); else state.hidden.add(k); render(); }
+    toggleKind(k) { if (state.hidden.has(k)) state.hidden.delete(k); else state.hidden.add(k); render(); },
+    toggleLayer(id) { if (state.layers.has(id)) state.layers.delete(id); else state.layers.add(id); render(); }
   };
 
   // ============ 6. 模組 ============
@@ -458,6 +491,8 @@ footer ul ul { margin-top: 4px; }
     $("map-note").textContent = M.text.mapNote;
     const viewBtns = d3.select("#views").selectAll("button").data(M.map.views).join("button")
       .attr("type", "button").text(v => v.label).on("click", (_, v) => actions.setView(v.id));
+    const layerBtns = d3.select("#map-layers").selectAll("button").data(M.layers).join("button")
+      .attr("type", "button").text(l => l.label).on("click", (_, l) => actions.toggleLayer(l.id));
 
     const gLand = svg.append("g"), gPol = svg.append("g"), gPlace = svg.append("g"), gLabel = svg.append("g");
     let W = 0, H = 0, proj = null, zt = d3.zoomIdentity, shownView = null, ids = [], shownLabels = new Set();
@@ -489,11 +524,13 @@ footer ul ul { margin-top: 4px; }
       gLand.append("path").attr("class", "grat").attr("d", path(d3.geoGraticule().step([M.map.graticule, M.map.graticule])()));
       if (land) gLand.append("path").attr("class", "land").attr("d", path(land));
 
-      // 統治範圍: 同一政權的多個圓合成一塊
-      const active = M.polities.map(p => ({ p, areas: areasAt(p, state.year) })).filter(d => d.areas.length);
-      gPol.selectAll("path").data(active, d => d.p.id).join("path").attr("class", "polity")
-        .style("fill", d => pcol(d.p.id)).style("stroke", d => pcol(d.p.id))
-        .attr("d", d => path({ type: "MultiPolygon", coordinates: d.areas.map(a => d3.geoCircle().center(a.c).radius(a.r / 111.2)().coordinates) }));
+      // 圖層: 依 data.js 的順序畫開著的圖層, 每個圖層各自有錯誤保護
+      const ctx = { path, proj, year: state.year, event: M.events[state.sel], drawn: new Set(), labels: [] };
+      gPol.selectAll("g").data(M.layers, l => l.id).join("g").each(function (l) {
+        const g = d3.select(this);
+        if (!state.layers.has(l.id)) { g.selectAll("*").remove(); return; }
+        guard({ name: "圖層 " + l.label, el }, () => LAYERS[l.id].draw({ ...ctx, g }));
+      });
 
       // 地點
       ids = Object.keys(M.places).filter(id => onScreen(xy(id)));
@@ -507,9 +544,8 @@ footer ul ul { margin-top: 4px; }
       pl.select(".dot").attr("r", id => hot.has(id) ? 4.5 : 2.5);
       pl.filter(id => hot.has(id)).raise();
 
-      // 名稱: 政權一定顯示, 事件地點一定顯示, 其他有空位才顯示
-      const labels = active.map(({ p, areas }) => ({ key: "p:" + p.id, text: p.name, kind: "polity", cls: "polity-label", color: pcol(p.id),
-        at: proj(p.labelAt || areas.reduce((a, b) => (b.r > a.r ? b : a)).c), rank: M.kind.polity.rank, must: true, cand: CAND_AREA }));
+      // 名稱: 政權一定顯示 (由圖層放進 ctx.labels), 事件地點一定顯示, 其他有空位才顯示
+      const labels = ctx.labels;
       ids.forEach(id => {
         const k = M.places[id].k, isHot = hot.has(id);
         labels.push({ key: id, text: M.places[id].n, kind: k, cls: "place-label k-" + k + (isHot ? " hot" : ""), at: xy(id),
@@ -560,6 +596,7 @@ footer ul ul { margin-top: 4px; }
     mod.update = () => {
       $("map-year").textContent = yearText();
       viewBtns.attr("aria-pressed", v => v.id === state.view);
+      layerBtns.attr("aria-pressed", l => state.layers.has(l.id));
       if (state.view !== shownView) { shownView = state.view; resetZoom(); return; }   // 換範圍: 回到預設大小
       if (zt.k > 1) {   // 放大中, 但事件地點在畫面外: 回到預設大小
         project();
@@ -745,17 +782,24 @@ footer ul ul { margin-top: 4px; }
     catch (err) { showBanner("模組無法啟動: " + create.name, [err.message + " (詳細內容見 console)"]); console.error(err); }
   });
 
-  // 整頁通用按鍵: ← → 上一則/下一則, 1-9 跳到該則, 0 跳到最後一則
+  // 整頁通用按鍵: ← → 上一則/下一則, Home 第一則, End 最後一則, 數字跳到第幾則 (單獨按 0 = 第一則).
+  // 數字先跳再修正: 按 1 馬上到第 1 則; TYPE_WAIT 內再按 2, 改到第 12 則. 輸入滿位數或後面不可能再接數字時, 不再等下一位
+  const TYPE_WAIT = 400, maxDigits = String(M.events.length).length;
   document.addEventListener("keydown", ev => {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
-    let i = null;
-    if (ev.key === "ArrowLeft") i = state.sel - 1;
-    else if (ev.key === "ArrowRight") i = state.sel + 1;
-    else if (/^[1-9]$/.test(ev.key)) i = Number(ev.key) - 1;
-    else if (ev.key === "0") i = M.events.length - 1;
-    if (i === null) return;
+    const last = M.events.length - 1;
+    if (/^[0-9]$/.test(ev.key)) {
+      ev.preventDefault();
+      if (!typed && ev.key === "0") { actions.select(0); return; }
+      const next = typed + ev.key;
+      actions.select(Number(next) - 1);   // 先跳 (超過總則數就停在最後一則); select 會清掉 typed
+      if (next.length < maxDigits && Number(next) * 10 <= M.events.length) { typed = next; typeTimer = setTimeout(cancelTyping, TYPE_WAIT); }
+      return;
+    }
+    const to = { ArrowLeft: state.sel - 1, ArrowRight: state.sel + 1, Home: 0, End: last }[ev.key];
+    if (to === undefined) return;
     ev.preventDefault();
-    actions.select(i);
+    actions.select(to);
   });
 
   render();

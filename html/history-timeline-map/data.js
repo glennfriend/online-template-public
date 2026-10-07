@@ -22,6 +22,14 @@ window.HISTORY = {
     ]
   },
 
+  // 地圖圖層 (地圖左上的開關), on = 預設開或關. 可用的圖層:
+  //   focus     = 事件焦點: 只畫當前事件相關的政權範圍 (事件的 p 與 involves). 適合講事件故事
+  //   territory = 統治範圍: 畫當年所有政權的範圍. 適合講勢力消長
+  layers: [
+    { id: "focus", label: "事件焦點", on: true },
+    { id: "territory", label: "統治範圍", on: false }
+  ],
+
   // 地圖名稱的類別. rank 越小越先放 (事件地點永遠最先). polity 是政權名稱 (固定類別, 一定顯示), 其他是地點的類別
   kinds: [
     { id: "polity", label: "政權", rank: 1 },
@@ -106,7 +114,8 @@ window.HISTORY = {
     matsu:     { n: "馬祖", lon: 119.9500, lat: 26.0800, k: "region" }
   },
 
-  // 事件: date 決定時間軸位置; when 是顯示用的文字; p = 事件發生時的政權; places = 地圖上要標出的地點;
+  // 事件: date 決定時間軸位置; when 是顯示用的文字; p = 事件發生時的政權; involves = 其他相關的政權 (事件焦點圖層會一起畫);
+  // places = 地圖上要標出的地點;
   // b = 重點 (每行一句); s = 補充說明 (來源說法不一致之處); ref = 出處 [網址, 顯示文字]
   events: [
     { date: "1624-08", when: "1624 年 8 月", t: "荷蘭人在大員蓋城堡", p: "nl", places: ["zeelandia"],
@@ -117,7 +126,7 @@ window.HISTORY = {
       b: ["西班牙人從菲律賓的馬尼拉坐船來, 在基隆外的和平島上岸.", "他們蓋了聖薩爾瓦多城, 想保護貿易, 也想傳教.", "幾年後, 他們又在淡水蓋了另一座城."],
       s: "上岸的日子有 5 月 11、12、16 日幾種說法, 這裡只寫月份.",
       ref: [["https://zh.wikipedia.org/wiki/聖薩爾瓦多城", "維基: 聖薩爾瓦多城"], ["https://en.wikipedia.org/wiki/Spanish_Formosa", "Wikipedia: Spanish Formosa"]] },
-    { date: "1642-08-26", when: "1642 年 8 月下旬", t: "荷蘭趕走西班牙", p: "nl", places: ["salvador"],
+    { date: "1642-08-26", when: "1642 年 8 月下旬", t: "荷蘭趕走西班牙", p: "nl", involves: ["es"], places: ["salvador"],
       b: ["西班牙把不少士兵調回菲律賓, 北台灣的防守變弱了.", "荷蘭派船攻打基隆, 西班牙守軍投降後被送回馬尼拉.", "從此荷蘭同時掌握台灣南部和北部的海岸."],
       s: "投降日有 8 月 26 日和 28 日兩種說法.",
       ref: [["https://zh.wikipedia.org/wiki/臺灣西班牙統治時期", "維基: 臺灣西班牙統治時期"], ["https://en.wikipedia.org/wiki/Battle_of_San_Salvador_(1642)", "Wikipedia: Battle of San Salvador"]] },
@@ -125,7 +134,7 @@ window.HISTORY = {
       b: ["1661 年 4 月, 鄭成功帶著約 2 萬 5 千名士兵從金門出發, 經鹿耳門進入台江內海.", "他先拿下赤崁, 再把熱蘭遮城圍了大約九個月.", "荷蘭人簽下投降書後離開, 明鄭時期開始."],
       s: "2 月 1 日是簽投降書, 2 月 9 日是交出城堡. 鹿耳門的水道後來被泥沙填平, 位置是大約.",
       ref: [["https://zh.wikipedia.org/wiki/鄭成功攻臺之役", "維基: 鄭成功攻臺之役"], ["https://en.wikipedia.org/wiki/Siege_of_Fort_Zeelandia", "Wikipedia: Siege of Fort Zeelandia"]] },
-    { date: "1683-07-16", when: "1683 年 7 月 16 日", t: "澎湖海戰, 清朝統治台灣", p: "qing", places: ["magong"],
+    { date: "1683-07-16", when: "1683 年 7 月 16 日", t: "澎湖海戰, 清朝統治台灣", p: "qing", involves: ["zh"], places: ["magong"],
       b: ["清朝的施琅帶領水師攻打澎湖, 和明鄭的水軍在海上決戰.", "明鄭打輸後決定投降, 明鄭時期結束.", "隔年 (1684) 清朝設立台灣府, 府城就在今天的台南."],
       s: "7 月 16 日是決戰日. 明鄭正式投降的日子, 有 9 月到 10 月好幾種說法.",
       ref: [["https://zh.wikipedia.org/wiki/澎湖海战", "維基: 澎湖海戰"], ["https://en.wikipedia.org/wiki/Kingdom_of_Tungning", "Wikipedia: Kingdom of Tungning"]] },
@@ -133,7 +142,7 @@ window.HISTORY = {
       b: ["林爽文在大里杙 (今台中大里) 起事, 很快攻下彰化.", "不同移民群體各有立場, 也有人幫清軍守城.", "清朝派福康安來台, 1788 年抓到林爽文; 諸羅縣因守城有功改名嘉義."],
       s: "常說 \"1786 年林爽文事件\", 那是農曆的乾隆 51 年; 換成西曆是 1787 年 1 月 16 日起事. 大里杙的位置是大約.",
       ref: [["https://zh.wikipedia.org/wiki/林爽文事件", "維基: 林爽文事件"], ["https://en.wikipedia.org/wiki/Lin_Shuangwen_rebellion", "Wikipedia: Lin Shuangwen rebellion"]] },
-    { date: "1874-05-22", when: "1874 年 5 月 22 日", t: "牡丹社事件", p: "qing", places: ["shimen"],
+    { date: "1874-05-22", when: "1874 年 5 月 22 日", t: "牡丹社事件", p: "qing", involves: ["ind"], places: ["shimen"],
       b: ["1871 年底, 一艘琉球的船被颱風吹到台灣南部, 54 名船員被當地排灣族殺害.", "1874 年日本以此為理由派兵上岸, 5 月 22 日和排灣族在石門交戰.", "這件事讓清朝開始重視台灣南部和東部."],
       s: "石門戰役是 5 月 22 日; 臺灣大百科寫 5 月 23 日.",
       ref: [["https://zh.wikipedia.org/wiki/牡丹社事件", "維基: 牡丹社事件"], ["https://en.wikipedia.org/wiki/Mudan_incident", "Wikipedia: Mudan incident"]] },
