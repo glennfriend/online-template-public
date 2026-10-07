@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>台灣歷史地圖</title>
+<title>歷史時間軸地圖</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* 範本: plans/2026-10-06-bronze-age-collapse. 版面: 地圖 (左上, 最大化) + 時間軸 (地圖下方) + 右欄 (名稱開關 / 各政權狀態 / 事件卡) */
+/* 版面: 地圖 (左上, 最大化) + 時間軸 (地圖下方) + 右欄 (名稱開關 / 政權狀態 / 事件卡). 政權顏色由 data.js 產生 (--p-<id>) */
 :root {
   --bg: #eef0ee;
   --panel: #f8f9f7;
@@ -21,14 +21,7 @@
   --fall: #a5312b;
   --ok: #4f7a3a;
   --warn: #9a5a24;
-  /* 政權顏色 */
-  --p-ind: #4f7a3a;
-  --p-nl: #c4661a;
-  --p-es: #7a4f9a;
-  --p-zh: #1f7f78;
-  --p-qing: #8a6a1f;
-  --p-jp: #b0353b;
-  --p-roc: #2f5f8a;
+  --steady: #2f5f8a;
   --font-display: "Noto Serif TC", "Songti TC", serif;
   --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, monospace;
@@ -37,16 +30,14 @@
   :root:not([data-theme="light"]) {
     --bg: #121618; --panel: #1a1f21; --ink: #e5e8e6; --muted: #9aa5a8; --line: #333b3e;
     --sea: #17242a; --land: #2b2c27; --land-edge: #4a4a40;
-    --fall: #e26b5f; --ok: #8fbf6f; --warn: #d4904f;
-    --p-ind: #8fbf6f; --p-nl: #ef9a4e; --p-es: #b892d6; --p-zh: #5cc2b9; --p-qing: #d3b45a; --p-jp: #ec7a7f; --p-roc: #7fb0de;
+    --fall: #e26b5f; --ok: #8fbf6f; --warn: #d4904f; --steady: #7fb0de;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #121618; --panel: #1a1f21; --ink: #e5e8e6; --muted: #9aa5a8; --line: #333b3e;
   --sea: #17242a; --land: #2b2c27; --land-edge: #4a4a40;
-  --fall: #e26b5f; --ok: #8fbf6f; --warn: #d4904f;
-  --p-ind: #8fbf6f; --p-nl: #ef9a4e; --p-es: #b892d6; --p-zh: #5cc2b9; --p-qing: #d3b45a; --p-jp: #ec7a7f; --p-roc: #7fb0de;
+  --fall: #e26b5f; --ok: #8fbf6f; --warn: #d4904f; --steady: #7fb0de;
   color-scheme: dark;
 }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65; }
@@ -58,9 +49,14 @@ h1 { font-size: clamp(24px, 2.6vw, 32px); font-weight: 900; letter-spacing: .01e
 h2 { font-size: 22px; font-weight: 600; }
 h3 { font-size: 17px; font-weight: 600; }
 p { margin: 0; }
-a { color: var(--p-roc); }
+a { color: var(--steady); }
 .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
-header { display: grid; gap: 10px; }
+
+/* 錯誤: 整頁 (banner) 與單一模組 (mod-err) */
+.banner { border: 1px solid var(--fall); color: var(--fall); background: var(--panel); border-radius: 6px; padding: 10px 14px; font-size: 14px; }
+.banner ul { margin: 6px 0 0; padding-left: 20px; }
+.mod-err { position: relative; z-index: 3; margin: 8px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--fall); color: var(--fall); font-size: 13px; border-radius: 4px; }
+.map-warn { position: relative; z-index: 3; margin: 50px 10px 0; padding: 6px 10px; color: var(--fall); font-size: 13px; }
 
 /* 一屏儀表板 */
 .dash { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0;
@@ -70,34 +66,33 @@ header { display: grid; gap: 10px; }
 .mapbox { grid-area: map; background: var(--sea); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; position: relative; min-height: 300px; }
 .mapbox svg { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
 .map-year { z-index: 1; position: absolute; top: 8px; right: 12px; font-family: var(--font-data); font-size: 22px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--panel) 85%, transparent); padding: 0 8px; border-radius: 4px; }
-.status h3 .mono { color: var(--fall); }
-.tlbox { grid-area: tl; display: grid; gap: 6px; min-width: 0; }
-.map-zoom { z-index: 1; position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
-.map-zoom button { font: 600 15px var(--font-data); width: 32px; height: 32px; padding: 0; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
-.map-zoom button.reset { font: 500 11px var(--font-body); height: 26px; }
-#map { cursor: grab; }
-#map:active { cursor: grabbing; }
-.layers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-.layers button { font: 500 13px var(--font-body); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; cursor: pointer; }
-.layers button[aria-pressed="true"] { color: var(--panel); background: var(--ink); border-color: var(--ink); }
-.map-tip { z-index: 2; position: absolute; pointer-events: none; font-size: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
 .map-tools { z-index: 1; position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 .map-tools button, .nav button { font: 500 13px var(--font-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
 .map-tools button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
-button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
+.map-zoom { z-index: 1; position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.map-zoom button { font: 600 15px var(--font-data); width: 32px; height: 32px; padding: 0; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.map-zoom button.reset { font: 500 11px var(--font-body); height: 26px; }
 .map-note { z-index: 1; position: absolute; bottom: 8px; right: 10px; font-size: 11px; color: var(--muted); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 2px 6px; border-radius: 3px; }
-.map-err { position: relative; z-index: 1; padding: 40px 20px; color: var(--fall); }
+.map-tip { z-index: 2; position: absolute; pointer-events: none; font-size: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
+#map { cursor: grab; }
+#map:active { cursor: grabbing; }
 .land { fill: var(--land); stroke: var(--land-edge); stroke-width: .6; }
 .grat { fill: none; stroke: var(--ink); stroke-opacity: .07; }
 .polity { stroke-width: 1.4; fill-opacity: .2; }
-.polity-label { font: 700 13px var(--font-body); paint-order: stroke; stroke: var(--land); stroke-width: 3px; }
 .place circle { fill: var(--muted); }
-.place text { font: 400 11px var(--font-body); fill: var(--muted); paint-order: stroke; stroke: var(--land); stroke-width: 3px; }
-.place.k-region text { font-style: italic; letter-spacing: .1em; }
 .place.k-region .dot { display: none; }
 .place.hot circle { fill: var(--fall); }
-.place.hot text { fill: var(--ink); font-weight: 700; font-size: 13px; }
-.place .ring { fill: none; stroke: var(--fall); stroke-width: 1.5; }
+.place .ring { fill: none; stroke: var(--fall); stroke-width: 1.5; display: none; }
+.place.hot .ring { display: inline; }
+.polity-label { font: 700 13px var(--font-body); paint-order: stroke; stroke: var(--land); stroke-width: 3px; }
+.place-label { font: 400 11px var(--font-body); fill: var(--muted); paint-order: stroke; stroke: var(--land); stroke-width: 3px; }
+.place-label.k-region { font-style: italic; letter-spacing: .1em; }
+.place-label.hot { fill: var(--ink); font-weight: 700; font-size: 13px; }
+
+.layers { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.layers button { font: 500 13px var(--font-body); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+.layers button[aria-pressed="true"] { color: var(--panel); background: var(--ink); border-color: var(--ink); }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
 .ev-stack { display: grid; }
@@ -110,18 +105,20 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--warn);
 .ev-body .src-line { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
 .nav { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
 .nav span { font-size: 12px; color: var(--muted); }
-.polities { display: grid; gap: 3px; }
 .status { padding-block: 12px; gap: 8px; }
+.status h3 .mono { color: var(--fall); }
+.polities { display: grid; gap: 3px; }
 .prow { display: grid; grid-template-columns: 70px 1fr 66px; gap: 8px; align-items: center; font-size: 13px; line-height: 1.5; }
+.prow .name { font-weight: 700; }
 .prow .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .prow .bar i { display: block; height: 100%; border-radius: 4px; transition: width .3s; }
 .chip { font-size: 11px; text-align: center; border-radius: 3px; padding: 1px 0; color: var(--panel); }
-.chip.up { background: var(--ok); } .chip.down { background: var(--warn); } .chip.steady { background: var(--p-roc); } .chip.gone { background: var(--fall); } .chip.none { background: var(--muted); }
+.chip.up { background: var(--ok); } .chip.down { background: var(--warn); } .chip.steady { background: var(--steady); } .chip.gone { background: var(--fall); } .chip.none { background: var(--muted); }
 .small { font-size: 12px; color: var(--muted); }
 
+.tlbox { grid-area: tl; display: grid; gap: 6px; min-width: 0; }
 .tl-scroll { position: relative; overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 .tl-scroll svg { display: block; }
-.tl-legend { position: absolute; top: 4px; right: 10px; font-size: 11px; gap: 10px; pointer-events: none; }
 .tl-axis text { font: 400 12px var(--font-data); fill: var(--muted); }
 .tl-axis line { stroke: var(--line); }
 .era-band text { font: 600 12px var(--font-body); }
@@ -135,7 +132,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--warn);
 .cursor-hit { fill: transparent; cursor: ew-resize; touch-action: none; }
 .cursor-knob { fill: var(--fall); stroke: var(--panel); stroke-width: 2; cursor: ew-resize; }
 #tl.dragging, #tl.dragging * { cursor: ew-resize; }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); align-items: center; }
 
 .eras { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .era-card { border-top: 4px solid var(--c); }
@@ -151,48 +147,41 @@ footer ul ul { margin-top: 4px; }
 </head>
 <body>
 <div class="wrap">
+  <div class="banner" id="banner" role="alert" hidden></div>
   <div class="screen">
   <header>
-    <h1>台灣歷史地圖: 1624 到 1996</h1>
+    <h1 id="heading"></h1>
   </header>
 
   <section class="dash" aria-label="地圖與時間軸">
     <div class="mapbox" id="mapbox">
-      <div class="map-tools" role="group" aria-label="地圖範圍">
-        <button type="button" id="v-near" aria-pressed="true">台灣與澎湖</button>
-        <button type="button" id="v-wide" aria-pressed="false">含金門馬祖</button>
-      </div>
+      <div class="map-tools" id="views" role="group" aria-label="地圖範圍"></div>
       <div class="map-year mono" id="map-year"></div>
-      <svg id="map" role="img" aria-label="台灣地圖"></svg>
+      <svg id="map" role="img" aria-label="地圖"></svg>
       <div class="map-tip" id="map-tip" hidden></div>
       <div class="map-zoom" role="group" aria-label="地圖縮放">
         <button type="button" id="z-in" aria-label="放大">+</button>
         <button type="button" id="z-out" aria-label="縮小">−</button>
         <button type="button" id="z-reset" class="reset" aria-label="重置縮放">重置</button>
       </div>
-      <div class="map-note">色塊只表示大約的統治範圍, 不是真實疆界</div>
+      <div class="map-note" id="map-note"></div>
     </div>
 
     <div class="tlbox">
       <div class="tl-scroll" id="tl-scroll">
-        <svg id="tl" tabindex="0" role="slider" aria-label="年份 (西元 1600 年到 2000 年)" aria-valuemin="1600" aria-valuemax="2000"></svg>
+        <svg id="tl" tabindex="0" role="slider" aria-label="年份"></svg>
       </div>
     </div>
 
     <div class="side">
-      <div class="layers" role="group" aria-label="地圖上顯示的名稱">
+      <div class="layers" id="layers" role="group" aria-label="地圖上顯示的名稱">
         <span>地圖顯示</span>
-        <button type="button" id="l-polity" aria-pressed="true">政權</button>
-        <button type="button" id="l-site" aria-pressed="true">史蹟</button>
-        <button type="button" id="l-city" aria-pressed="true">城市</button>
-        <button type="button" id="l-region" aria-pressed="true">地區</button>
       </div>
-      <div class="card status">
-        <h3><span class="mono" id="st-year"></span> 誰在統治</h3>
+      <div class="card status" id="status">
+        <h3><span class="mono" id="st-year"></span> <span id="status-title"></span></h3>
         <div class="polities" id="polities"></div>
-        <p class="small">長條 = 大約控制了台灣本島多少地方 (示意).</p>
+        <p class="small" id="bar-note"></p>
       </div>
-
       <div class="card evcard" id="evcard" aria-live="polite" title="鍵盤: ← → 上一則/下一則, 1-9 跳到第 1-9 則, 0 跳到最後一則">
         <div class="ev-stack" id="ev-stack"></div>
         <div class="nav">
@@ -205,40 +194,9 @@ footer ul ul { margin-top: 4px; }
   </section>
   </div>
 
-  <section>
-    <h2 style="margin-bottom:14px">台灣的六個時期</h2>
-    <div class="eras">
-      <div class="card era-card" style="--c:var(--p-ind)">
-        <div class="yrs">很久以前 起</div>
-        <h3>原住民族</h3>
-        <p>原住民族很早就住在台灣, 有許多不同的族群和部落. 外來的人來之前, 整座島由各個部落自己管理. 後來外來政權一步步擴大, 山地部落到 1915 年前後才被日本完全控制.</p>
-      </div>
-      <div class="card era-card" style="--c:var(--p-nl)">
-        <div class="yrs">1624–1662</div>
-        <h3>荷蘭與西班牙</h3>
-        <p>歐洲人為了和中國、日本做生意而來. 荷蘭在南部的大員 (台南), 西班牙在北部的基隆和淡水. 1642 年荷蘭趕走西班牙.</p>
-      </div>
-      <div class="card era-card" style="--c:var(--p-zh)">
-        <div class="yrs">1662–1683</div>
-        <h3>明鄭</h3>
-        <p>鄭成功打敗荷蘭, 以台南為中心建立政權. 他的家族統治了 21 年, 帶著士兵開墾土地.</p>
-      </div>
-      <div class="card era-card" style="--c:var(--p-qing)">
-        <div class="yrs">1683–1895</div>
-        <h3>清朝</h3>
-        <p>統治時間最長, 共 212 年. 從西部平原開始, 慢慢擴大到宜蘭和東部. 1885 年台灣成為一個省.</p>
-      </div>
-      <div class="card era-card" style="--c:var(--p-jp)">
-        <div class="yrs">1895–1945</div>
-        <h3>日本</h3>
-        <p>清朝打輸甲午戰爭, 把台灣割讓給日本. 日本統治 50 年, 修了縱貫鐵路, 也用武力控制了山地.</p>
-      </div>
-      <div class="card era-card" style="--c:var(--p-roc)">
-        <div class="yrs">1945 起</div>
-        <h3>中華民國</h3>
-        <p>二戰結束後接收台灣. 經歷二二八事件和 38 年的戒嚴, 1987 年解嚴, 1996 年人民第一次直接選總統.</p>
-      </div>
-    </div>
+  <section id="eras-section">
+    <h2 id="eras-title" style="margin-bottom:14px"></h2>
+    <div class="eras" id="eras"></div>
   </section>
 
   <footer>
@@ -247,6 +205,7 @@ footer ul ul { margin-top: 4px; }
       <li>拖動地圖下方時間軸上的紅線, 地圖會顯示那一年各政權大約的統治範圍.</li>
       <li>點時間軸上的事件, 地圖會標出事件發生的地點.</li>
       <li>在地圖上滾動滑鼠滾輪可以放大縮小, 按住拖曳可以移動.</li>
+      <li>地圖上沒寫名稱的點, 滑鼠移上去 (手機用點的) 會顯示名稱.</li>
       <li>在頁面上任何地方都可以用鍵盤換事件:
         <ul>
           <li>← → 切換上一則 / 下一則</li>
@@ -256,547 +215,550 @@ footer ul ul { margin-top: 4px; }
       </li>
     </ul>
     <h3>資料來源</h3>
-    <ul>
-      <li>事件的日期和地點, 以中文與英文維基百科交叉比對; 每則事件卡下方有連結.</li>
-      <li>遺址座標另外用 OpenStreetMap 核對.</li>
-      <li>來源之間說法不一致的地方, 寫在事件卡的 "補充說明".</li>
-      <li>統治範圍的色塊和長條, 是依各時期的文字描述估計的示意, 不是真實疆界.</li>
-      <li>地圖: Natural Earth 10m 海岸線.</li>
-    </ul>
+    <ul id="sources"></ul>
   </footer>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
-<script src="land-10m-tw.js"></script>
+<!-- 外部相依: 每個 <script> 標明它提供的全域變數 (data-global). 引擎一開始就檢查, 缺了就在頁面上列出網址. data-optional = 缺了只影響地圖海岸線 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" data-global="d3"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js" data-global="topojson"></script>
+<script src="data.js" data-global="HISTORY"></script>
+<script src="land.js" data-global="LAND_TOPO" data-optional></script>
 <script>
 (function () {
-  // ---------- 資料 ----------
-  // 史蹟座標: 維基百科條目座標, 多數另以 OpenStreetMap 核對; 標 "約" 者為近似位置
-  const PLACES = {
-    zeelandia: { n: "熱蘭遮城 (安平古堡)", lon: 120.1605, lat: 23.0011, k: "site" },
-    luermen:   { n: "鹿耳門 (約)", lon: 120.1245, lat: 23.0373, k: "site" },
-    salvador:  { n: "聖薩爾瓦多城 (和平島)", lon: 121.7720, lat: 25.1590, k: "site" },
-    magong:    { n: "澎湖天后宮 (馬公)", lon: 119.5639, lat: 23.5648, k: "site" },
-    dali:      { n: "大里杙 (約)", lon: 120.6778, lat: 24.0990, k: "site" },
-    shimen:    { n: "石門古戰場", lon: 120.7606, lat: 22.1113, k: "site" },
-    huwei:     { n: "滬尾砲台", lon: 121.4296, lat: 25.1790, k: "site" },
-    shiqiu:    { n: "獅球嶺砲台", lon: 121.7350, lat: 25.1203, k: "site" },
-    zhongshan: { n: "中山堂", lon: 121.5101, lat: 25.0432, k: "site" },
-    aodi:      { n: "澳底", lon: 121.9272, lat: 25.0426, k: "site" },
-    tcpark:    { n: "台中公園", lon: 120.6833, lat: 24.1450, k: "site" },
-    wushe:     { n: "霧社", lon: 121.1323, lat: 24.0213, k: "site" },
-    tianma:    { n: "天馬茶房 (原址)", lon: 121.5122, lat: 25.0540, k: "site" },
-    president: { n: "總統府", lon: 121.5120, lat: 25.0400, k: "site" },
-    taipei:    { n: "台北", lon: 121.5650, lat: 25.0330, k: "city" },
-    keelung:   { n: "基隆", lon: 121.7420, lat: 25.1280, k: "city" },
-    yilan:     { n: "宜蘭", lon: 121.7530, lat: 24.7570, k: "city" },
-    taichung:  { n: "台中", lon: 120.6470, lat: 24.1630, k: "city" },
-    tainan:    { n: "台南", lon: 120.2130, lat: 22.9970, k: "city" },
-    kaohsiung: { n: "高雄", lon: 120.3010, lat: 22.6270, k: "city" },
-    hualien:   { n: "花蓮", lon: 121.6010, lat: 23.9770, k: "city" },
-    taitung:   { n: "台東", lon: 121.1440, lat: 22.7560, k: "city" },
-    mountains: { n: "中央山脈", lon: 120.9500, lat: 23.8500, k: "region" },
-    plain:     { n: "嘉南平原", lon: 120.2800, lat: 23.5500, k: "region" },
-    penghu:    { n: "澎湖", lon: 119.4300, lat: 23.4300, k: "region" },
-    kinmen:    { n: "金門", lon: 118.3600, lat: 24.3700, k: "region" },
-    matsu:     { n: "馬祖", lon: 119.9500, lat: 26.0800, k: "region" }
-  };
-  const kindOf = id => PLACES[id].k;
+  "use strict";
+  const $ = id => document.getElementById(id);
 
-  const ZH = "https://zh.wikipedia.org/wiki/", EN = "https://en.wikipedia.org/wiki/";
-  // y = 西元年 (含月份小數, 用來排序與定位); p = 事件發生時的政權
-  const EVENTS = [
-    { y: 1624.6, when: "1624 年 8 月", t: "荷蘭人在大員蓋城堡", p: "nl", places: ["zeelandia"],
-      b: ["荷蘭人想找一個能和中國、日本做生意的基地, 選中了台南的大員.", "他們開始蓋熱蘭遮城, 1634 年才全部完工.", "這座城堡也是荷蘭人管理台灣的辦公中心."],
-      s: "現在的安平古堡大多是後來重建的, 地圖標的是遺址位置.", ref: [[ZH + "安平古堡", "維基: 安平古堡"], [EN + "Dutch_Formosa", "Wikipedia: Dutch Formosa"]] },
-    { y: 1626.4, when: "1626 年 5 月", t: "西班牙人來到北台灣", p: "es", places: ["salvador"],
-      b: ["西班牙人從菲律賓的馬尼拉坐船來, 在基隆外的和平島上岸.", "他們蓋了聖薩爾瓦多城, 想保護貿易, 也想傳教.", "幾年後, 他們又在淡水蓋了另一座城."],
-      s: "上岸的日子有 5 月 11、12、16 日幾種說法, 這裡只寫月份.", ref: [[ZH + "聖薩爾瓦多城", "維基: 聖薩爾瓦多城"], [EN + "Spanish_Formosa", "Wikipedia: Spanish Formosa"]] },
-    { y: 1642.65, when: "1642 年 8 月下旬", t: "荷蘭趕走西班牙", p: "nl", places: ["salvador"],
-      b: ["西班牙把不少士兵調回菲律賓, 北台灣的防守變弱了.", "荷蘭派船攻打基隆, 西班牙守軍投降後被送回馬尼拉.", "從此荷蘭同時掌握台灣南部和北部的海岸."],
-      s: "投降日有 8 月 26 日和 28 日兩種說法.", ref: [[ZH + "臺灣西班牙統治時期", "維基: 臺灣西班牙統治時期"], [EN + "Battle_of_San_Salvador_(1642)", "Wikipedia: Battle of San Salvador"]] },
-    { y: 1662.1, when: "1662 年 2 月 1 日", t: "鄭成功打敗荷蘭人", p: "zh", places: ["luermen", "zeelandia"],
-      b: ["1661 年 4 月, 鄭成功帶著約 2 萬 5 千名士兵從金門出發, 經鹿耳門進入台江內海.", "他先拿下赤崁, 再把熱蘭遮城圍了大約九個月.", "荷蘭人簽下投降書後離開, 明鄭時期開始."],
-      s: "2 月 1 日是簽投降書, 2 月 9 日是交出城堡. 鹿耳門的水道後來被泥沙填平, 位置是大約.", ref: [[ZH + "鄭成功攻臺之役", "維基: 鄭成功攻臺之役"], [EN + "Siege_of_Fort_Zeelandia", "Wikipedia: Siege of Fort Zeelandia"]] },
-    { y: 1683.54, when: "1683 年 7 月 16 日", t: "澎湖海戰, 清朝統治台灣", p: "qing", places: ["magong"],
-      b: ["清朝的施琅帶領水師攻打澎湖, 和明鄭的水軍在海上決戰.", "明鄭打輸後決定投降, 明鄭時期結束.", "隔年 (1684) 清朝設立台灣府, 府城就在今天的台南."],
-      s: "7 月 16 日是決戰日. 明鄭正式投降的日子, 有 9 月到 10 月好幾種說法.", ref: [[ZH + "澎湖海战", "維基: 澎湖海戰"], [EN + "Kingdom_of_Tungning", "Wikipedia: Kingdom of Tungning"]] },
-    { y: 1787.04, when: "1787 年 1 月 16 日", t: "林爽文事件", p: "qing", places: ["dali"],
-      b: ["林爽文在大里杙 (今台中大里) 起事, 很快攻下彰化.", "不同移民群體各有立場, 也有人幫清軍守城.", "清朝派福康安來台, 1788 年抓到林爽文; 諸羅縣因守城有功改名嘉義."],
-      s: "常說 \"1786 年林爽文事件\", 那是農曆的乾隆 51 年; 換成西曆是 1787 年 1 月 16 日起事. 大里杙的位置是大約.", ref: [[ZH + "林爽文事件", "維基: 林爽文事件"], [EN + "Lin_Shuangwen_rebellion", "Wikipedia: Lin Shuangwen rebellion"]] },
-    { y: 1874.39, when: "1874 年 5 月 22 日", t: "牡丹社事件", p: "qing", places: ["shimen"],
-      b: ["1871 年底, 一艘琉球的船被颱風吹到台灣南部, 54 名船員被當地排灣族殺害.", "1874 年日本以此為理由派兵上岸, 5 月 22 日和排灣族在石門交戰.", "這件事讓清朝開始重視台灣南部和東部."],
-      s: "石門戰役是 5 月 22 日; 臺灣大百科寫 5 月 23 日.", ref: [[ZH + "牡丹社事件", "維基: 牡丹社事件"], [EN + "Mudan_incident", "Wikipedia: Mudan incident"]] },
-    { y: 1884.77, when: "1884 年 10 月 8 日", t: "清法戰爭: 滬尾之役", p: "qing", places: ["huwei", "shiqiu"],
-      b: ["清朝和法國為了越南打仗, 戰火延燒到台灣.", "法軍佔領了基隆, 但在淡水 (滬尾) 被清軍打退.", "戰後清朝更看重台灣這個地方."],
-      s: "法軍 8 月起攻打基隆, 10 月 2 日佔領基隆, 1885 年 6 月才撤走.", ref: [[ZH + "滬尾之役", "維基: 滬尾之役"], [EN + "Battle_of_Tamsui", "Wikipedia: Battle of Tamsui"]] },
-    { y: 1885.78, when: "1885 年 10 月 12 日", t: "台灣建省", p: "qing", places: ["zhongshan", "tcpark"],
-      b: ["清朝決定讓台灣成為一個省, 劉銘傳是第一位巡撫.", "劉銘傳修鐵路、架電報線, 推動很多新建設.", "原本計畫把省城蓋在台中, 但沒有完成, 巡撫一直在台北辦公."],
-      s: "10 月 12 日是清朝下令建省; 正式分開成省是 1887 到 1888 年. 巡撫辦公的地方是今天的中山堂一帶.", ref: [[ZH + "臺灣建省", "維基: 臺灣建省"], [ZH + "臺灣布政使司衙門", "維基: 臺灣布政使司衙門"]] },
-    { y: 1895.46, when: "1895 年 4–6 月", t: "馬關條約, 日本統治台灣", p: "jp", places: ["aodi", "zhongshan"],
-      b: ["清朝打輸甲午戰爭, 4 月 17 日在日本下關簽下馬關條約, 把台灣和澎湖割讓給日本.", "5 月 29 日日軍從澳底上岸, 台灣各地抵抗了大約 5 個月.", "6 月 17 日日本在台北舉行始政式, 開始 50 年的統治."],
-      s: "簽條約的下關在日本, 不在這張地圖的範圍內.", ref: [[ZH + "馬關條約", "維基: 馬關條約"], [ZH + "乙未戰爭", "維基: 乙未戰爭"]] },
-    { y: 1908.3, when: "1908 年 4 月 20 日", t: "縱貫鐵路全線通車", p: "jp", places: ["tcpark"],
-      b: ["日本從 1899 年起, 由南北兩端同時開始修鐵路.", "1908 年基隆到高雄的鐵路接通, 南北往來快了很多.", "同年 10 月在台中公園辦慶祝典禮, 公園的湖心亭就是為典禮蓋的."],
-      s: "慶典日 (10 月 24 日) 只找到二手資料.", ref: [[ZH + "縱貫線", "維基: 縱貫線"], [ZH + "臺中公園", "維基: 臺中公園"]] },
-    { y: 1930.82, when: "1930 年 10 月 27 日", t: "霧社事件", p: "jp", places: ["wushe"],
-      b: ["賽德克族人長期受到日本警察的壓迫和勞役.", "在莫那魯道帶領下, 他們在運動會當天襲擊日本人.", "日本出動軍隊和警察鎮壓, 事後也檢討了對原住民的統治方式."],
-      s: "雙方紀錄的傷亡人數差很多, 這裡不寫數字.", ref: [[ZH + "霧社事件", "維基: 霧社事件"], [EN + "Musha_Incident", "Wikipedia: Musha Incident"]] },
-    { y: 1945.81, when: "1945 年 10 月 25 日", t: "中華民國接收台灣", p: "roc", places: ["zhongshan"],
-      b: ["1945 年 8 月日本宣布投降, 第二次世界大戰結束.", "10 月 25 日在台北公會堂 (今中山堂) 舉行受降典禮, 陳儀代表中華民國接受.", "台灣從此由中華民國政府管理."],
-      s: "", ref: [[ZH + "臺灣光復", "維基: 臺灣光復"], [EN + "Retrocession_Day", "Wikipedia: Retrocession Day"]] },
-    { y: 1947.15, when: "1947 年 2 月 27–28 日", t: "二二八事件", p: "roc", places: ["tianma"],
-      b: ["戰後物價飛漲, 很多人對政府不滿.", "2 月 27 日查緝私菸時發生衝突, 隔天民眾抗議, 事件擴大到全台灣.", "政府派軍隊鎮壓, 很多人遇難或失蹤; 這段歷史後來被公開討論和紀念."],
-      s: "天馬茶房的原建築已拆除, 地圖標的是原址. 遇難人數各方估計差很多, 這裡不寫數字.", ref: [[ZH + "二二八事件", "維基: 二二八事件"], [EN + "February_28_incident", "Wikipedia: February 28 incident"]] },
-    { y: 1949.38, when: "1949 年 5 月 20 日", t: "戒嚴開始, 政府遷台", p: "roc", places: ["president"],
-      b: ["國共內戰中國民政府節節敗退, 台灣從 5 月 20 日開始戒嚴, 集會和結社都受到限制.", "12 月 7 日, 中華民國政府決定遷到台北.", "戒嚴一共持續了 38 年."],
-      s: "戒嚴令 5 月 19 日公布, 5 月 20 日生效.", ref: [[ZH + "臺灣戒嚴時期", "維基: 臺灣戒嚴時期"], [ZH + "中華民國政府遷臺", "維基: 中華民國政府遷臺"]] },
-    { y: 1987.54, when: "1987 年 7 月 15 日", t: "解除戒嚴", p: "roc", places: ["president"],
-      b: ["蔣經國總統宣布, 從 7 月 15 日起解除台灣的戒嚴.", "人民可以更自由地集會、組織團體、發表意見.", "台灣的民主化從此加快."],
-      s: "金門、馬祖的戰地政務是另外結束的.", ref: [[ZH + "解嚴", "維基: 解嚴"], [EN + "Martial_law_in_Taiwan", "Wikipedia: Martial law in Taiwan"]] },
-    { y: 1996.22, when: "1996 年 3 月 23 日", t: "第一次總統直選", p: "roc", places: ["president"],
-      b: ["以前總統是由國民大會代表選出, 人民不能直接投票.", "1996 年 3 月 23 日, 台灣人民第一次自己投票選總統.", "李登輝當選, 這是台灣民主化的重要一步."],
-      s: "", ref: [[ZH + "1996年中華民國總統選舉", "維基: 1996年總統選舉"], [EN + "1996_Taiwanese_presidential_election", "Wikipedia: 1996 election"]] }
-  ];
-
-  // 各政權: k = [西元年, 大約控制台灣本島的比例] (示意); areas = 統治範圍色塊 (圓心, 半徑 km, 起訖年), 依各時期文字描述估計
-  const POLITIES = [
-    { id: "ind", n: "原住民族", color: "--p-ind", goneText: "失去自主", labelAt: [121.2, 23.2],
-      k: [[1600, 1], [1624, .95], [1662, .8], [1683, .75], [1723, .65], [1812, .6], [1875, .5], [1910, .45], [1915, 0]],
-      areas: [{ c: [120.95, 23.65], r: 190, from: 1600, to: 1624 }, { c: [121.1, 23.6], r: 120, from: 1624, to: 1875 }, { c: [121.05, 23.75], r: 90, from: 1875, to: 1915 }] },
-    { id: "nl", n: "荷蘭", color: "--p-nl", goneText: "已離開",
-      k: [[1624.6, .05], [1636, .25], [1642, .3], [1661.3, .3], [1662.1, 0]],
-      areas: [{ c: [120.30, 23.20], r: 70, from: 1624.6, to: 1662.1 }, { c: [121.6, 25.15], r: 20, from: 1642.65, to: 1668 }] },
-    { id: "es", n: "西班牙", color: "--p-es", goneText: "已離開",
-      k: [[1626.4, .03], [1629, .06], [1637, .04], [1642.65, 0]],
-      areas: [{ c: [121.60, 25.12], r: 28, from: 1626.4, to: 1642.65 }] },
-    { id: "zh", n: "明鄭", color: "--p-zh", goneText: "已結束",
-      k: [[1661.3, .1], [1662.1, .2], [1683.5, .25], [1683.6, 0]],
-      areas: [{ c: [120.30, 23.10], r: 55, from: 1661.3, to: 1683.6 }, { c: [119.56, 23.56], r: 22, from: 1662.1, to: 1683.6 }] },
-    { id: "qing", n: "清朝", color: "--p-qing", goneText: "已結束",
-      k: [[1683.54, .25], [1723, .35], [1812, .4], [1875, .5], [1895.3, .5], [1895.4, 0]],
-      areas: [{ c: [120.40, 23.20], r: 70, from: 1683.54, to: 1895.4 }, { c: [120.75, 24.45], r: 65, from: 1723, to: 1895.4 },
-        { c: [121.75, 24.70], r: 25, from: 1812, to: 1895.4 }, { c: [121.15, 22.75], r: 25, from: 1875, to: 1895.4 },
-        { c: [121.55, 23.95], r: 25, from: 1875, to: 1895.4 }, { c: [120.75, 22.0], r: 20, from: 1875, to: 1895.4 },
-        { c: [119.56, 23.56], r: 25, from: 1683.54, to: 1895.4 }] },
-    { id: "jp", n: "日本", color: "--p-jp", goneText: "已離開",
-      k: [[1895.4, .5], [1910, .55], [1915, 1], [1945.8, 1], [1945.81, 0]],
-      areas: [{ c: [120.40, 23.20], r: 70, from: 1895.4, to: 1915 }, { c: [120.75, 24.45], r: 65, from: 1895.4, to: 1915 },
-        { c: [121.75, 24.70], r: 25, from: 1895.4, to: 1915 }, { c: [121.35, 23.30], r: 70, from: 1895.4, to: 1915 },
-        { c: [120.95, 23.65], r: 200, from: 1915, to: 1945.81 }, { c: [119.56, 23.56], r: 25, from: 1895.4, to: 1945.81 }] },
-    { id: "roc", n: "中華民國", color: "--p-roc", goneText: "已結束",
-      k: [[1945.81, 1], [2000, 1]],
-      areas: [{ c: [120.95, 23.65], r: 200, from: 1945.81, to: 2001 }, { c: [119.56, 23.56], r: 25, from: 1945.81, to: 2001 },
-        { c: [118.35, 24.45], r: 15, from: 1945.81, to: 2001 }, { c: [119.95, 26.15], r: 15, from: 1945.81, to: 2001 }] }
-  ];
-  const POL = Object.fromEntries(POLITIES.map(p => [p.id, p]));
-
-  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-
-  // 年份由小到大
-  function strength(p, y) {
-    const k = p.k;
-    if (y < k[0][0]) return { s: 0, before: true };
-    if (y >= k[k.length - 1][0]) return { s: k[k.length - 1][1], before: false };
-    for (let i = 0; i < k.length - 1; i++) {
-      const [y0, s0] = k[i], [y1, s1] = k[i + 1];
-      if (y >= y0 && y <= y1) return { s: s0 + (s1 - s0) * (y - y0) / (y1 - y0), before: false };
-    }
-    return { s: 0, before: false };
+  // ============ 1. 錯誤顯示 ============
+  function showBanner(title, lines) {
+    const box = $("banner");
+    const h = document.createElement("strong");
+    h.textContent = title;
+    const ul = document.createElement("ul");
+    lines.forEach(t => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+    box.append(h, ul);
+    box.hidden = false;
+    console.error(title, lines);
   }
-  function status(p, y) {
-    const now = strength(p, y), later = strength(p, y + 10);
+  // 模組出錯時, 只在該模組的區塊顯示錯誤, 其他模組照常運作
+  function guard(mod, fn) {
+    const old = mod.el.querySelector(":scope > .mod-err");
+    try {
+      fn();
+      if (old) old.remove();
+    } catch (err) {
+      console.error("[" + mod.name + "]", err);
+      const box = old || mod.el.appendChild(document.createElement("div"));
+      box.className = "mod-err";
+      box.textContent = mod.name + " 出錯: " + err.message + " (詳細內容見 console)";
+    }
+  }
+
+  // ============ 2. 外部相依 ============
+  const missing = [...document.querySelectorAll("script[data-global]")]
+    .filter(s => !("optional" in s.dataset) && !window[s.dataset.global]);
+  if (missing.length) {
+    showBanner("缺少必要的檔案, 頁面無法運作. 請確認網路連線, 或檔案是否和 index.html 放在同一個資料夾:",
+      missing.map(s => s.dataset.global + " ← " + s.getAttribute("src")));
+    return;
+  }
+
+  // ============ 3. 資料: 換算日期並檢查 ============
+  // "YYYY" / "YYYY-MM" / "YYYY-MM-DD" (西元) → 年份小數, 例: "1683-07-16" → 1683.54
+  function toYear(v) {
+    const m = /^(\d{1,4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(String(v));
+    if (!m) throw new Error("日期格式錯誤: " + JSON.stringify(v) + ", 要寫成 \"YYYY\", \"YYYY-MM\" 或 \"YYYY-MM-DD\"");
+    const y = +m[1], at = (yy, mo, d) => { const t = new Date(0); t.setUTCFullYear(yy, mo, d); return t.getTime(); };
+    const t0 = at(y, 0, 1), t1 = at(y + 1, 0, 1);
+    return y + (at(y, m[2] ? m[2] - 1 : 0, m[3] ? +m[3] : 1) - t0) / (t1 - t0);
+  }
+
+  // 回傳 { model, errors }: 有錯的項目略過並列在 errors, 其餘照常顯示
+  function loadModel(H) {
+    const errors = [];
+    const date = (v, where) => { try { return toYear(v); } catch (e) { errors.push(where + ": " + e.message); return null; } };
+    const range = H.range.map((v, i) => date(v, "range[" + i + "]"));
+    if (range.includes(null)) throw new Error("時間軸範圍 range 錯誤: " + errors.join("; "));
+    const kind = Object.fromEntries(H.kinds.map(k => [k.id, k]));
+    if (!kind.polity) throw new Error("kinds 缺少 polity (政權名稱的類別)");
+
+    const places = {};
+    Object.entries(H.places).forEach(([id, p]) => {
+      if (!kind[p.k] || p.k === "polity") errors.push("地點 " + id + ": 類別 k = " + JSON.stringify(p.k) + " 不在 kinds 裡");
+      else if (!isFinite(p.lon) || !isFinite(p.lat)) errors.push("地點 " + id + ": 缺少經緯度 lon / lat");
+      else places[id] = p;
+    });
+
+    const polities = [];
+    H.polities.forEach(p => {
+      const where = "政權 " + p.id;
+      const start = date(p.start, where + " start"), end = p.end == null ? Infinity : date(p.end, where + " end");
+      if (start == null || end == null) return;
+      const share = p.share.map(([d, v], i) => [date(d, where + " share[" + i + "]"), v]).filter(k => k[0] != null);
+      const lonLat = c => Array.isArray(c) && isFinite(c[0]) && isFinite(c[1]);
+      const areas = p.areas.filter((a, i) => {
+        const ok = lonLat(a.c) && a.r > 0;
+        if (!ok) errors.push(where + " areas[" + i + "]: 圓心 c 要是 [經度, 緯度], 半徑 r 要大於 0");
+        return ok;
+      }).map((a, i) => ({ c: a.c, r: a.r,
+        from: a.from == null ? start : date(a.from, where + " areas[" + i + "].from"),
+        to: a.to == null ? end : date(a.to, where + " areas[" + i + "].to") })).filter(a => a.from != null && a.to != null);
+      if (p.labelAt && !lonLat(p.labelAt)) { errors.push(where + ": labelAt 要是 [經度, 緯度]"); return; }
+      if (!share.length) { errors.push(where + ": share 至少要有一筆"); return; }
+      polities.push({ ...p, start, end, share, areas });
+    });
+    const pol = Object.fromEntries(polities.map(p => [p.id, p]));
+
+    const events = [];
+    H.events.forEach((e, i) => {
+      const where = "事件 " + (i + 1) + " (" + e.t + ")";
+      const y = date(e.date, where + " date");
+      const bad = e.places.filter(id => !places[id]);
+      if (y == null) return;
+      if (!pol[e.p]) errors.push(where + ": 政權 p = " + JSON.stringify(e.p) + " 不在 polities 裡");
+      else if (bad.length) errors.push(where + ": 找不到地點 " + bad.join(", "));
+      else if (y < range[0] || y > range[1]) errors.push(where + ": 日期不在時間軸範圍 range 內");
+      else events.push({ ...e, y });
+    });
+    events.sort((a, b) => a.y - b.y);
+
+    // 時期: 起點 = 政權的 start (第一個從時間軸起點開始), 終點 = 下一個時期的起點
+    const eras = [];
+    H.eras.forEach(e => { if (pol[e.polity]) eras.push({ ...e }); else errors.push("時期 " + e.name + ": 政權 " + e.polity + " 不在 polities 裡"); });
+    eras.forEach((e, i) => { e.start = i === 0 ? range[0] : pol[e.polity].start; });
+    eras.forEach((e, i) => { e.end = i + 1 < eras.length ? eras[i + 1].start : range[1]; });
+
+    return { errors, model: { ...H, range, kind, places, polities, pol, events, eras } };
+  }
+
+  // 政權在某一年的控制比例 (到 end 時降為 0) 與狀態
+  function shareAt(p, y) {
+    if (y < p.start) return { s: 0, before: true };
+    if (y >= p.end) return { s: 0, before: false };
+    const k = p.end < Infinity ? p.share.concat([[p.end, 0]]) : p.share;
+    if (y <= k[0][0]) return { s: k[0][1], before: false };
+    for (let i = 0; i < k.length - 1; i++) {
+      if (y <= k[i + 1][0]) return { s: k[i][1] + (k[i + 1][1] - k[i][1]) * (y - k[i][0]) / (k[i + 1][0] - k[i][0]), before: false };
+    }
+    return { s: k[k.length - 1][1], before: false };
+  }
+  function statusAt(p, y) {
+    const now = shareAt(p, y), later = shareAt(p, y + 10);
     if (now.before) return ["none", "還沒來"];
-    if (now.s <= 0.01) return ["gone", p.goneText];
-    if (later.s < now.s - 0.02) return ["down", "縮小中"];
-    if (later.s > now.s + 0.02) return ["up", "擴大中"];
+    if (y >= p.end) return ["gone", p.goneText || "已結束"];
+    if (later.s < now.s - .02) return ["down", "縮小中"];
+    if (later.s > now.s + .02) return ["up", "擴大中"];
     return ["steady", "統治中"];
   }
-  const activeAreas = (p, y) => p.areas.filter(a => y >= a.from && y < a.to);
+  const areasAt = (p, y) => p.areas.filter(a => y >= a.from && y < a.to);
+  const pcol = id => "var(--p-" + id + ")";
 
-  // ---------- 狀態 ----------
-  let year = 1624.6, sel = 0, view = "near", land = null;
-  const hiddenKinds = new Set();   // 被名稱開關關掉的類別
-
-  // ---------- 地圖 ----------
-  let W = 800, H = 560;
-  const svg = d3.select("#map");
-  const VIEWS = {
-    near: { extent: [[119.25, 21.85], [122.05, 25.35]] },
-    wide: { extent: [[118.0, 21.85], [122.1, 26.35]] }
-  };
-  function projFor(v) {
-    const [[x0, y0], [x1, y1]] = VIEWS[v].extent;
-    const box = { type: "Polygon", coordinates: [[[x0, y0], [x0, y1], [x1, y1], [x1, y0], [x0, y0]]] };
-    return d3.geoConicConformal().parallels([22, 26]).rotate([-(x0 + x1) / 2, 0]).fitExtent([[24, 24], [W - 24, H - 24]], box);
-  }
-  const gLand = svg.append("g"), gPol = svg.append("g"), gPlace = svg.append("g");
-  let zt = d3.zoomIdentity, curProj = null;
-  const zoom = d3.zoom().scaleExtent([1, 12]).on("zoom", ev => { zt = ev.transform; drawMap(); });
-  svg.call(zoom);
-  const resetZoom = () => svg.call(zoom.transform, d3.zoomIdentity);
-  document.getElementById("z-in").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1.6);
-  document.getElementById("z-out").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.6);
-  document.getElementById("z-reset").onclick = resetZoom;
-
-  function drawMap() {
-    const box = document.getElementById("mapbox");
-    W = box.clientWidth || 800; H = box.clientHeight || 560;
-    svg.attr("viewBox", "0 0 " + W + " " + H);
-    // 可拖曳範圍比畫面多半個寬高, 放大後靠邊的地方 (例如台北) 也能拖到畫面中間
-    zoom.extent([[0, 0], [W, H]]).translateExtent([[-W / 2, -H / 2], [W * 1.5, H * 1.5]]);
-    const proj = projFor(view), [tx, ty] = proj.translate();
-    proj.scale(proj.scale() * zt.k).translate([tx * zt.k + zt.x, ty * zt.k + zt.y]);
-    curProj = proj;
-    const path = d3.geoPath(proj);
-    gLand.selectAll("*").remove();
-    gLand.append("path").attr("class", "grat").attr("d", path(d3.geoGraticule().step([1, 1])()));
-    if (land) gLand.append("path").attr("class", "land").attr("d", path(land));
-
-    // 統治範圍色塊: 同一政權的多個圓合成一個 MultiPolygon, 名稱寫在最大的那塊
-    const pol = gPol.selectAll("g.p").data(POLITIES, d => d.id).join(enter => {
-      const g = enter.append("g").attr("class", "p");
-      g.append("path").attr("class", "polity");
-      g.append("text").attr("class", "polity-label").attr("text-anchor", "middle");
-      return g;
-    });
-    pol.each(function (p) {
-      const areas = activeAreas(p, year), g = d3.select(this), col = css(p.color);
-      const geo = areas.length ? { type: "MultiPolygon", coordinates: areas.map(a => d3.geoCircle().center(a.c).radius(a.r / 111.2)().coordinates) } : null;
-      g.select("path").attr("d", geo ? path(geo) : null).attr("fill", col).attr("stroke", col);
-      const big = areas.slice().sort((a, b) => b.r - a.r)[0];
-      const t = g.select("text").attr("fill", col).text(p.n).attr("display", big && !hiddenKinds.has("polity") ? null : "none");
-      if (big) {
-        const [x, yy] = proj(big.c);
-        // 原住民族標在色塊下緣, 避免和其他政權的名稱疊在一起
-        const [lx, ly] = p.labelAt ? proj(p.labelAt) : [x, yy];
-        t.datum({ px: lx, py: ly });
-      }
-    });
-
-    // 地點
-    const hot = new Set(EVENTS[sel].places);
-    const ids = Object.keys(PLACES).filter(id => {
-      const [x, y] = proj([PLACES[id].lon, PLACES[id].lat]);
-      return x > 0 && x < W && y > 0 && y < H;
-    });
-    const pl = gPlace.selectAll("g.place").data(ids, d => d).join(enter => {
-      const g = enter.append("g").attr("class", "place");
-      g.append("circle").attr("class", "ring").attr("r", 9);
-      g.append("circle").attr("class", "dot").attr("r", 3);
-      g.append("text");
-      return g;
-    });
-    pl.attr("class", id => "place k-" + kindOf(id)).attr("transform", id => "translate(" + proj([PLACES[id].lon, PLACES[id].lat]) + ")")
-      .classed("hot", id => hot.has(id));
-    pl.select(".ring").attr("display", id => hot.has(id) ? null : "none");
-    pl.select(".dot").attr("r", id => hot.has(id) ? 4.5 : 2.5);
-    pl.select("text").text(id => PLACES[id].n);
-    pl.filter(id => hot.has(id)).raise();
-    placeLabels(pl, hot);
-  }
-
-  // ---------- 名稱排版 ----------
-  // 依優先順序一個一個放: 事件地點 > 政權 > 城市 > 史蹟 > 地區.
-  // 每個名稱依序試候選位置, 第一個不擋到別人的就用; 都擋到就先不顯示 (滑鼠移到點上可看名稱).
-  // 事件地點一定顯示: 都擋到時選重疊最少的位置. 結果只由畫面決定, 同樣畫面每次都一樣.
-  const RANK = { polity: 1, city: 2, site: 3, region: 4 };
-  const CAND_POINT = [[6, -6, "start"], [6, 14, "start"], [-6, -6, "end"], [-6, 14, "end"]]; // 右上, 右下, 左上, 左下: [dx, 基線 dy, 對齊]
-  const CAND_MID = [[0, 4, "middle"], [0, -12, "middle"], [0, 20, "middle"]];                 // 置中, 上, 下
-  const textBox = new Map();   // 名稱字框 (寬, 基線以上, 基線以下), 依文字快取
-  function placeLabels(pl, hot) {
-    const items = [], taken = [];
-    pl.each(function (id) {
-      const [px, py] = curProj([PLACES[id].lon, PLACES[id].lat]), k = kindOf(id);
-      if (k !== "region") taken.push([px - 4, py - 4, px + 4, py + 4]);   // 點本身也不能被字蓋住
-      items.push({ el: this.querySelector("text"), px: 0, py: 0, ox: px, oy: py, kind: k,
-        rank: hot.has(id) ? 0 : RANK[k], must: hot.has(id), cand: k === "region" ? CAND_MID : CAND_POINT });
-    });
-    gPol.selectAll("text.polity-label").each(function (d) {
-      if (this.getAttribute("display") !== "none") items.push({ el: this, px: d.px, py: d.py, kind: "polity", rank: RANK.polity, must: false, cand: CAND_MID });
-    });
-    items.forEach((it, i) => it.order = i);
-    items.sort((a, b) => a.rank - b.rank || a.order - b.order);
+  // ============ 4. 名稱排版 (純計算, 不碰 DOM) ============
+  // 依 rank 由小到大放, 每個名稱依序試候選位置, 第一個不擋到別人的就用.
+  // 都會擋到: must 選重疊最少的位置, 其他不顯示 (回傳 null). 同樣的輸入一定得到同樣的結果, 拖時間軸時字不會跳.
+  const CAND_POINT = [[6, -6, "start"], [6, 14, "start"], [-6, -6, "end"], [-6, 14, "end"]];   // 右上, 右下, 左上, 左下: [dx, 基線 dy, 對齊]
+  const CAND_MID = [[0, 4, "middle"], [0, -12, "middle"], [0, 20, "middle"]];                  // 置中, 上, 下
+  const CAND_AREA = [[0, 4, "middle"], [0, -14, "middle"], [0, 22, "middle"], [0, -32, "middle"], [0, 40, "middle"]];
+  function placeLabels(items, obstacles, W, H) {
+    const taken = obstacles.slice(), out = items.map(() => null);
     const overlap = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
-    items.forEach(it => {
-      const el = it.el;
-      if (hiddenKinds.has(it.kind)) { el.setAttribute("display", "none"); return; }
-      el.removeAttribute("display");
-      const key = el.textContent + (it.must ? "!" : "") + it.kind;
-      if (!textBox.has(key)) {
-        el.setAttribute("x", 0); el.setAttribute("y", 0); el.setAttribute("text-anchor", "start");
-        const bb = el.getBBox();
-        textBox.set(key, { w: bb.width, asc: -bb.y, desc: bb.y + bb.height });
-      }
-      const { w, asc, desc } = textBox.get(key);
-      const baseX = it.ox === undefined ? it.px : 0, baseY = it.ox === undefined ? it.py : 0;   // 地名在 <g> 裡, 座標相對於點
-      const ax = it.ox === undefined ? 0 : it.ox, ay = it.ox === undefined ? 0 : it.oy;
+    items.map((_, i) => i).sort((a, b) => items[a].rank - items[b].rank || a - b).forEach(i => {
+      const it = items[i];
       let best = null, bestScore = Infinity;
       for (const [dx, dy, anchor] of it.cand) {
-        const x = ax + baseX + dx, y = ay + baseY + dy;
-        const x0 = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
-        const box = [x0 - 1, y - asc, x0 + w + 1, y + desc];
+        const x = it.x + dx, y = it.y + dy, x0 = anchor === "start" ? x : anchor === "end" ? x - it.w : x - it.w / 2;
+        const box = [x0 - 1, y - it.asc, x0 + it.w + 1, y + it.desc];
         const outside = box[0] < 0 || box[2] > W || box[1] < 0 || box[3] > H;
-        const score = taken.reduce((sum, t) => sum + overlap(box, t), 0) + (outside ? 1e6 : 0);
-        if (score < bestScore) { best = { dx, dy, anchor, box }; bestScore = score; }
+        const score = taken.reduce((s, t) => s + overlap(box, t), 0) + (outside ? 1e6 : 0);
+        if (score < bestScore) { best = { x, y, anchor, box }; bestScore = score; }
         if (score === 0) break;
       }
-      if (bestScore > 0 && !it.must) { el.setAttribute("display", "none"); return; }
-      el.setAttribute("x", baseX + best.dx); el.setAttribute("y", baseY + best.dy); el.setAttribute("text-anchor", best.anchor);
+      if (bestScore > 0 && !it.must) return;
       taken.push(best.box);
+      out[i] = best;
     });
+    return out;
   }
 
-  // 名字沒顯示的點: 滑鼠移上去 (手機用點的) 顯示名稱. 依滑鼠位置找 12px 內最近的點, 因為有些點幾乎疊在一起
-  const tip = document.getElementById("map-tip");
-  function updateTip(ev) {
-    const [mx, my] = d3.pointer(ev, svg.node());
-    let near = null, nd = 12;
-    gPlace.selectAll("g.place").each(function (id) {
-      const [px, py] = curProj([PLACES[id].lon, PLACES[id].lat]), d = Math.hypot(px - mx, py - my);
-      if (d < nd) { nd = d; near = this; }
-    });
-    const t = near && near.querySelector("text");
-    if (!t || t.getAttribute("display") !== "none") { tip.hidden = true; return; }
-    tip.textContent = t.textContent;
-    tip.style.left = (mx + 10) + "px";
-    tip.style.top = (my - 28) + "px";
-    tip.hidden = false;
+  // ============ 5. 狀態與動作 (模組之間只透過這裡溝通) ============
+  let M;
+  try {
+    const r = loadModel(window.HISTORY);
+    M = r.model;
+    if (r.errors.length) showBanner("資料有錯, 以下項目已略過 (請修改 data.js):", r.errors);
+  } catch (err) {
+    showBanner("data.js 的格式錯誤, 頁面無法運作:", [err.message]);
+    console.error(err);
+    return;
   }
-  svg.on("pointermove.tip", updateTip).on("click.tip", updateTip).on("pointerleave.tip", () => { tip.hidden = true; });
+  if (!M.events.length) { showBanner("沒有可以顯示的事件", ["請檢查 data.js 的 events"]); return; }
 
-  function setView(v) {
-    view = v;
-    document.getElementById("v-near").setAttribute("aria-pressed", v === "near");
-    document.getElementById("v-wide").setAttribute("aria-pressed", v === "wide");
-    zt = d3.zoomIdentity;
-    svg.property("__zoom", d3.zoomIdentity);
-    drawMap();
-  }
-  // 名稱開關: 記錄要隱藏的類別後重畫, 藏起來的字會讓出空間給其他名稱
-  [["l-polity", "polity"], ["l-site", "site"], ["l-city", "city"], ["l-region", "region"]].forEach(([id, kind]) => {
-    const btn = document.getElementById(id);
-    btn.onclick = () => {
-      const on = btn.getAttribute("aria-pressed") !== "true";
-      btn.setAttribute("aria-pressed", on);
-      if (on) hiddenKinds.delete(kind); else hiddenKinds.add(kind);
-      drawMap();
-    };
-  });
-  document.getElementById("v-near").onclick = () => setView("near");
-  document.getElementById("v-wide").onclick = () => setView("wide");
+  const state = { year: M.events[0].y, sel: 0, view: M.map.views[0].id, hidden: new Set() };
+  const yearText = () => "西元 " + Math.floor(state.year) + " 年";
+  const modules = [];
+  const render = () => modules.forEach(m => guard(m, m.update));
 
-  // ---------- 側欄 ----------
-  const stack = document.getElementById("ev-stack");
-  const items = EVENTS.map(e => {
-    const it = document.createElement("div");
-    it.className = "ev-item off";
-    const yr = document.createElement("div");
-    yr.className = "ev-year";
-    yr.style.color = "var(" + POL[e.p].color + ")";
-    yr.textContent = e.when;
-    const who = document.createElement("span");
-    who.className = "who";
-    who.style.background = "var(" + POL[e.p].color + ")";
-    who.textContent = POL[e.p].n;
-    yr.appendChild(who);
-    const h = document.createElement("h3");
-    h.textContent = e.t;
-    const body = document.createElement("div");
-    body.className = "ev-body";
-    const ul = document.createElement("ul");
-    e.b.forEach(line => { const li = document.createElement("li"); li.textContent = line; ul.appendChild(li); });
-    body.appendChild(ul);
-    if (e.s) { const sp = document.createElement("span"); sp.className = "src-line"; sp.textContent = "補充說明: " + e.s; body.appendChild(sp); }
-    const refs = document.createElement("span");
-    refs.className = "src-line";
-    refs.append("出處: ");
-    e.ref.forEach(([url, label], i) => {
-      if (i) refs.append(" · ");
-      const a = document.createElement("a");
-      a.href = url; a.target = "_blank"; a.rel = "noopener"; a.textContent = label;
-      refs.appendChild(a);
-    });
-    body.appendChild(refs);
-    it.append(yr, h, body);
-    stack.appendChild(it);
-    return it;
-  });
-  function drawCard() {
-    items.forEach((it, i) => it.classList.toggle("off", i !== sel));
-    document.getElementById("ev-count").textContent = (sel + 1) + " / " + EVENTS.length;
+  const inExtent = (p, [[x0, y0], [x1, y1]]) => p.lon >= x0 && p.lon <= x1 && p.lat >= y0 && p.lat <= y1;
+  function fitView() {   // 事件地點不在目前範圍內時, 換成第一個放得下的範圍
+    const ids = M.events[state.sel].places, fits = v => ids.every(id => inExtent(M.places[id], v.extent));
+    if (!fits(M.map.views.find(v => v.id === state.view))) { const v = M.map.views.find(fits); if (v) state.view = v.id; }
   }
-  function drawPolities() {
-    const box = document.getElementById("polities");
-    box.innerHTML = "";
-    POLITIES.forEach(p => {
-      const st = strength(p, year).s, [cls, lab] = status(p, year);
-      const row = document.createElement("div");
-      row.className = "prow";
-      row.innerHTML = '<span style="color:var(' + p.color + ');font-weight:700">' + p.n + '</span>' +
-        '<span class="bar"><i style="width:' + Math.round(st * 100) + '%;background:var(' + p.color + ')"></i></span>' +
-        '<span class="chip ' + cls + '">' + lab + "</span>";
-      box.appendChild(row);
+  const actions = {
+    select(i) {
+      state.sel = Math.max(0, Math.min(M.events.length - 1, i));
+      state.year = M.events[state.sel].y;
+      fitView(); render();
+    },
+    setYear(y) {   // 換年份, 並選最接近的事件
+      state.year = Math.max(M.range[0], Math.min(M.range[1], y));
+      let best = 0;
+      M.events.forEach((e, i) => { if (Math.abs(e.y - state.year) < Math.abs(M.events[best].y - state.year)) best = i; });
+      state.sel = best;
+      fitView(); render();
+    },
+    setView(v) { state.view = v; render(); },
+    toggleKind(k) { if (state.hidden.has(k)) state.hidden.delete(k); else state.hidden.add(k); render(); }
+  };
+
+  // ============ 6. 模組 ============
+  // 每個模組: { name, el, update }. update 只讀 state, 改變 state 一律呼叫 actions
+
+  // 6a. 頁面文字與時期簡介 (只在啟動時畫一次)
+  function createPage() {
+    document.title = M.title;
+    $("heading").textContent = M.heading;
+    $("eras-title").textContent = M.text.erasTitle;
+    M.eras.forEach(e => {
+      const p = M.pol[e.polity], card = document.createElement("div");
+      card.className = "card era-card";
+      card.style.setProperty("--c", pcol(p.id));
+      const yrs = document.createElement("div");
+      yrs.className = "yrs";
+      yrs.textContent = e.years || (Math.floor(p.start) + (p.end < Infinity ? "–" + Math.floor(p.end) : " 起"));
+      const h = document.createElement("h3"); h.textContent = e.title;
+      const d = document.createElement("p"); d.textContent = e.desc;
+      card.append(yrs, h, d);
+      $("eras").appendChild(card);
     });
+    M.sources.forEach(t => { const li = document.createElement("li"); li.textContent = t; $("sources").appendChild(li); });
+    // 政權顏色: 由資料產生 CSS 變數 --p-<id> (淺色 / 深色)
+    const vars = i => M.polities.map(p => "--p-" + p.id + ":" + p.color[i]).join(";");
+    const st = document.createElement("style");
+    st.textContent = ":root{" + vars(0) + "}@media (prefers-color-scheme: dark){:root:not([data-theme=\"light\"]){" + vars(1) + "}}:root[data-theme=\"dark\"]{" + vars(1) + "}";
+    document.head.appendChild(st);
+    return { name: "頁面文字", el: $("eras-section"), update() {} };
   }
 
-  // ---------- 時間軸 ----------
-  const Y0 = 1600, Y1 = 2000, ROW_H = 19, TOP = 42;
-  const ERAS = [[1600, 1624.6, "原住民族", "--p-ind"], [1624.6, 1662.1, "荷西", "--p-nl"], [1662.1, 1683.54, "明鄭", "--p-zh"],
-    [1683.54, 1895.4, "清朝", "--p-qing"], [1895.4, 1945.81, "日本", "--p-jp"], [1945.81, 2000, "中華民國", "--p-roc"]];
-  const tl = d3.select("#tl");
-  let x, evG, cursorG, TH, tlW = 0;
-  const moveCursor = () => cursorG.attr("transform", "translate(" + x(year) + ",0)");
+  // 6b. 地圖: 海岸線, 統治範圍, 地點, 名稱排版, 縮放, 提示
+  function createMap() {
+    const el = $("mapbox"), svg = d3.select("#map"), tip = $("map-tip");
+    const mod = { name: "地圖", el };
+    const land = window.LAND_TOPO ? topojson.feature(window.LAND_TOPO, window.LAND_TOPO.objects.land) : null;
+    if (!land) { const w = el.appendChild(document.createElement("div")); w.className = "map-warn"; w.textContent = "海岸線資料 land.js 載入失敗, 地圖只顯示地點與統治範圍."; }
+    $("map-note").textContent = M.text.mapNote;
+    const viewBtns = d3.select("#views").selectAll("button").data(M.map.views).join("button")
+      .attr("type", "button").text(v => v.label).on("click", (_, v) => actions.setView(v.id));
 
-  // 依容器實際寬度重畫 (1px = 1px, 文字不縮放)
-  function drawTimeline() {
-    const TW = Math.max(860, document.getElementById("tl-scroll").clientWidth);
-    if (TW === tlW) return;
-    tlW = TW;
-    x = d3.scaleLinear().domain([Y0, Y1]).range([30, TW - 30]);
-    tl.selectAll("*").remove();
+    const gLand = svg.append("g"), gPol = svg.append("g"), gPlace = svg.append("g"), gLabel = svg.append("g");
+    let W = 0, H = 0, proj = null, zt = d3.zoomIdentity, shownView = null, ids = [], shownLabels = new Set();
+    const zoom = d3.zoom().scaleExtent([1, 12]).on("zoom", ev => { zt = ev.transform; guard(mod, draw); });
+    svg.call(zoom);
+    const resetZoom = () => svg.call(zoom.transform, d3.zoomIdentity);   // 會觸發 zoom 事件而重畫
+    $("z-in").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1.6);
+    $("z-out").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.6);
+    $("z-reset").onclick = resetZoom;
 
-    // 事件排列: 依序找不重疊的列
-    const rows = [];
-    const evPos = EVENTS.map((e, i) => {
-      const px = x(e.y), w = e.t.length * 13 + 18, flip = px + w > TW - 10;
-      const left = flip ? px - w : px;
-      let r = 0;
-      while (rows[r] !== undefined && rows[r] > left - 4) r++;
-      rows[r] = flip ? px + 8 : px + w;
-      return { i, px, row: r, flip };
-    });
-    TH = TOP + rows.length * ROW_H + 26;
-    tl.attr("width", TW).attr("height", TH).attr("viewBox", "0 0 " + TW + " " + TH);
-
-    // 政權時期底色
-    const eras = tl.append("g").attr("class", "era-band");
-    ERAS.forEach(([a, b, n, c]) => {
-      eras.append("rect").attr("x", x(a)).attr("width", x(b) - x(a)).attr("y", 0).attr("height", 22).attr("fill", "var(" + c + ")").attr("opacity", .18);
-      eras.append("rect").attr("x", x(a)).attr("width", x(b) - x(a)).attr("y", 22).attr("height", TH - 44).attr("fill", "var(" + c + ")").attr("opacity", .04);
-      if (x(b) - x(a) > n.length * 13 + 8) eras.append("text").attr("x", x(a) + 5).attr("y", 15).attr("fill", "var(" + c + ")").text(n);
-    });
-
-    const axis = tl.append("g").attr("class", "tl-axis").attr("transform", "translate(0," + (TH - 22) + ")");
-    d3.range(Y0, Y1 + 1, 50).forEach(v => {
-      axis.append("line").attr("x1", x(v)).attr("x2", x(v)).attr("y1", -(TH - 44)).attr("y2", 4).attr("stroke-opacity", .5);
-      axis.append("text").attr("x", x(v)).attr("y", 17).attr("text-anchor", "middle").text(v);
-    });
-
-    evG = tl.append("g").selectAll("g").data(evPos).join("g")
-      .attr("class", "tl-ev").attr("tabindex", 0).attr("role", "button")
-      .attr("aria-label", d => EVENTS[d.i].when + " " + EVENTS[d.i].t)
-      .attr("transform", d => "translate(" + d.px + "," + (TOP + d.row * ROW_H) + ")")
-      .on("click", (_, d) => select(d.i))
-      .on("keydown", (ev, d) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(d.i); } });
-    evG.append("circle").attr("r", 5.5).attr("fill", d => "var(" + POL[EVENTS[d.i].p].color + ")");
-    evG.append("text").attr("x", d => d.flip ? -9 : 9).attr("y", 4).attr("text-anchor", d => d.flip ? "end" : "start").text(d => EVENTS[d.i].t);
-
-    cursorG = tl.append("g");
-    cursorG.append("line").attr("class", "cursor-line").attr("y1", 22).attr("y2", TH - 22);
-    cursorG.append("rect").attr("class", "cursor-hit").attr("x", -9).attr("width", 18).attr("y", 14).attr("height", TH - 36);
-    cursorG.append("circle").attr("class", "cursor-knob").attr("cy", 22).attr("r", 7);
-    moveCursor();
-    evG.classed("sel", d => d.i === sel);
-  }
-  drawTimeline();
-  new ResizeObserver(drawTimeline).observe(document.getElementById("tl-scroll"));
-
-  // ---------- 互動 ----------
-  function showYear() {
-    const t = "西元 " + Math.floor(year) + " 年";
-    document.getElementById("map-year").textContent = t;
-    document.getElementById("st-year").textContent = t;
-  }
-  function render() {
-    showYear();
-    moveCursor();
-    tl.attr("aria-valuenow", Math.floor(year)).attr("aria-valuetext", "西元 " + Math.floor(year) + " 年");
-    evG.classed("sel", d => d.i === sel);
-    drawCard(); drawPolities(); drawMap();
-  }
-  function fitView(i) {
-    const needWide = EVENTS[i].places.some(id => {
-      const p = PLACES[id], [[a, b], [c, d]] = VIEWS.near.extent;
-      return p.lon < a || p.lon > c || p.lat < b || p.lat > d;
-    });
-    if (needWide && view !== "wide") setView("wide");
-    else if (zt.k > 1 && curProj) {
-      // 放大中, 但事件地點在畫面外: 回到預設大小
-      const out = EVENTS[i].places.some(id => {
-        const [px, py] = curProj([PLACES[id].lon, PLACES[id].lat]);
-        return px < 0 || px > W || py < 0 || py > H;
-      });
-      if (out) resetZoom();
+    function project() {
+      W = el.clientWidth || 800; H = el.clientHeight || 560;
+      svg.attr("viewBox", "0 0 " + W + " " + H);
+      // 可拖曳範圍比畫面多半個寬高, 放大後靠邊的地方也能拖到畫面中間
+      zoom.extent([[0, 0], [W, H]]).translateExtent([[-W / 2, -H / 2], [W * 1.5, H * 1.5]]);
+      const [[x0, y0], [x1, y1]] = M.map.views.find(v => v.id === state.view).extent;
+      const box = { type: "Polygon", coordinates: [[[x0, y0], [x0, y1], [x1, y1], [x1, y0], [x0, y0]]] };
+      const p = d3.geoConicConformal().parallels(M.map.parallels).rotate([-(x0 + x1) / 2, 0]).fitExtent([[24, 24], [W - 24, H - 24]], box);
+      const [tx, ty] = p.translate();
+      proj = p.scale(p.scale() * zt.k).translate([tx * zt.k + zt.x, ty * zt.k + zt.y]);
     }
-  }
-  function select(i) {
-    sel = i; year = EVENTS[i].y;
-    fitView(i);
-    render();
-  }
-  // 換年份: 選最接近的事件
-  function setYear(y) {
-    year = Math.max(Y0, Math.min(Y1, Math.round(y)));
-    let best = 0;
-    EVENTS.forEach((e, i) => { if (Math.abs(e.y - year) < Math.abs(EVENTS[best].y - year)) best = i; });
-    sel = best;
-    fitView(sel);
-    render();
-  }
-  const yearAt = ev => x.invert(d3.pointer(ev, tl.node())[0]);
+    const xy = id => proj([M.places[id].lon, M.places[id].lat]);
+    const onScreen = ([x, y]) => x > 0 && x < W && y > 0 && y < H;
 
-  // 拖動紅線 (滑鼠可從時間軸任一處開始拖; 觸控只從紅線開始拖, 其他地方保留左右捲動)
-  let dragging = false;
-  tl.on("pointerdown", ev => {
-    if (ev.target.closest(".tl-ev")) return;
-    const onCursor = ev.target.closest(".cursor-hit, .cursor-knob");
-    if (ev.pointerType !== "mouse" && !onCursor) return;
-    dragging = true;
-    tl.classed("dragging", true);
-    tl.node().setPointerCapture(ev.pointerId);
-    setYear(yearAt(ev));
-    ev.preventDefault();
+    function draw() {
+      project();
+      const path = d3.geoPath(proj), hot = new Set(M.events[state.sel].places);
+      gLand.selectAll("*").remove();
+      gLand.append("path").attr("class", "grat").attr("d", path(d3.geoGraticule().step([M.map.graticule, M.map.graticule])()));
+      if (land) gLand.append("path").attr("class", "land").attr("d", path(land));
+
+      // 統治範圍: 同一政權的多個圓合成一塊
+      const active = M.polities.map(p => ({ p, areas: areasAt(p, state.year) })).filter(d => d.areas.length);
+      gPol.selectAll("path").data(active, d => d.p.id).join("path").attr("class", "polity")
+        .style("fill", d => pcol(d.p.id)).style("stroke", d => pcol(d.p.id))
+        .attr("d", d => path({ type: "MultiPolygon", coordinates: d.areas.map(a => d3.geoCircle().center(a.c).radius(a.r / 111.2)().coordinates) }));
+
+      // 地點
+      ids = Object.keys(M.places).filter(id => onScreen(xy(id)));
+      const pl = gPlace.selectAll("g").data(ids, d => d).join(enter => {
+        const g = enter.append("g");
+        g.append("circle").attr("class", "ring").attr("r", 9);
+        g.append("circle").attr("class", "dot");
+        return g;
+      }).attr("class", id => "place k-" + M.places[id].k + (hot.has(id) ? " hot" : ""))
+        .attr("transform", id => "translate(" + xy(id) + ")");
+      pl.select(".dot").attr("r", id => hot.has(id) ? 4.5 : 2.5);
+      pl.filter(id => hot.has(id)).raise();
+
+      // 名稱: 政權一定顯示, 事件地點一定顯示, 其他有空位才顯示
+      const labels = active.map(({ p, areas }) => ({ key: "p:" + p.id, text: p.name, kind: "polity", cls: "polity-label", color: pcol(p.id),
+        at: proj(p.labelAt || areas.reduce((a, b) => (b.r > a.r ? b : a)).c), rank: M.kind.polity.rank, must: true, cand: CAND_AREA }));
+      ids.forEach(id => {
+        const k = M.places[id].k, isHot = hot.has(id);
+        labels.push({ key: id, text: M.places[id].n, kind: k, cls: "place-label k-" + k + (isHot ? " hot" : ""), at: xy(id),
+          rank: isHot ? 0 : M.kind[k].rank, must: isHot, cand: M.kind[k].centered ? CAND_MID : CAND_POINT });
+      });
+      drawLabels(labels.filter(l => !state.hidden.has(l.kind)));
+    }
+
+    const textBox = new Map();   // 字框 (寬, 基線以上, 基線以下), 依樣式 + 文字快取
+    function drawLabels(labels) {
+      const t = gLabel.selectAll("text").data(labels, d => d.key).join("text")
+        .attr("class", d => d.cls).style("fill", d => d.color || null).text(d => d.text);
+      t.each(function (d) {
+        const key = d.cls + "|" + d.text;
+        if (!textBox.has(key)) {
+          this.removeAttribute("display");
+          this.setAttribute("x", 0); this.setAttribute("y", 0); this.setAttribute("text-anchor", "start");
+          const b = this.getBBox();
+          textBox.set(key, { w: b.width, asc: -b.y, desc: b.y + b.height });
+        }
+        Object.assign(d, textBox.get(key));
+      });
+      const obstacles = ids.filter(id => !M.kind[M.places[id].k].centered).map(id => { const [x, y] = xy(id); return [x - 4, y - 4, x + 4, y + 4]; });
+      const pos = placeLabels(labels.map(d => ({ x: d.at[0], y: d.at[1], w: d.w, asc: d.asc, desc: d.desc, rank: d.rank, must: d.must, cand: d.cand })), obstacles, W, H);
+      labels.forEach((d, i) => { d.pos = pos[i]; });
+      shownLabels = new Set(labels.filter(d => d.pos).map(d => d.key));
+      t.each(function (d) {
+        if (!d.pos) { this.setAttribute("display", "none"); return; }
+        this.removeAttribute("display");
+        this.setAttribute("x", d.pos.x); this.setAttribute("y", d.pos.y); this.setAttribute("text-anchor", d.pos.anchor);
+      });
+    }
+
+    // 沒寫名稱的點: 滑鼠移上去 (手機用點的) 顯示名稱. 依滑鼠位置找 12px 內最近的點, 因為有些點幾乎疊在一起
+    function updateTip(ev) {
+      const [mx, my] = d3.pointer(ev, svg.node());
+      let near = null, nd = 12;
+      ids.forEach(id => { const [x, y] = xy(id), d = Math.hypot(x - mx, y - my); if (d < nd) { nd = d; near = id; } });
+      if (!near || shownLabels.has(near) || state.hidden.has(M.places[near].k)) { tip.hidden = true; return; }
+      tip.textContent = M.places[near].n;
+      tip.style.left = (mx + 10) + "px";
+      tip.style.top = (my - 28) + "px";
+      tip.hidden = false;
+    }
+    svg.on("pointermove.tip", ev => guard(mod, () => updateTip(ev))).on("click.tip", ev => guard(mod, () => updateTip(ev)))
+      .on("pointerleave.tip", () => { tip.hidden = true; });
+
+    mod.update = () => {
+      $("map-year").textContent = yearText();
+      viewBtns.attr("aria-pressed", v => v.id === state.view);
+      if (state.view !== shownView) { shownView = state.view; resetZoom(); return; }   // 換範圍: 回到預設大小
+      if (zt.k > 1) {   // 放大中, 但事件地點在畫面外: 回到預設大小
+        project();
+        if (M.events[state.sel].places.some(id => !onScreen(xy(id)))) { resetZoom(); return; }
+      }
+      draw();
+    };
+    new ResizeObserver(() => guard(mod, draw)).observe(el);
+    // 字框是用目前的字型量的; 網頁字型載入完成後字寬會變, 清掉重量再排一次
+    document.fonts.addEventListener("loadingdone", () => { textBox.clear(); guard(mod, draw); });
+    return mod;
+  }
+
+  // 6c. 時間軸: 時期底色, 事件, 紅線 (拖動或點擊換年份)
+  function createTimeline() {
+    const el = $("tl-scroll"), tl = d3.select("#tl"), mod = { name: "時間軸", el };
+    const [Y0, Y1] = M.range, ROW_H = 19, TOP = 42;
+    let x = null, evG = null, cursorG = null, width = 0;
+    tl.attr("aria-valuemin", Math.floor(Y0)).attr("aria-valuemax", Math.floor(Y1));
+
+    function draw() {   // 依容器實際寬度重畫 (1px = 1px, 文字不縮放)
+      const TW = Math.max(860, el.clientWidth);
+      if (TW === width) return;
+      width = TW;
+      x = d3.scaleLinear().domain([Y0, Y1]).range([30, TW - 30]);
+      tl.selectAll("*").remove();
+      // 事件排列: 依序找不重疊的列
+      const rows = [];
+      const pos = M.events.map((e, i) => {
+        const px = x(e.y), w = e.t.length * 13 + 18, flip = px + w > TW - 10, left = flip ? px - w : px;
+        let r = 0;
+        while (rows[r] !== undefined && rows[r] > left - 4) r++;
+        rows[r] = flip ? px + 8 : px + w;
+        return { i, px, row: r, flip };
+      });
+      const TH = TOP + rows.length * ROW_H + 26;
+      tl.attr("width", TW).attr("height", TH).attr("viewBox", "0 0 " + TW + " " + TH);
+
+      const bands = tl.append("g").attr("class", "era-band");
+      M.eras.forEach(e => {
+        const x0 = x(e.start), w = x(e.end) - x0, c = pcol(e.polity);
+        bands.append("rect").attr("x", x0).attr("width", w).attr("y", 0).attr("height", 22).style("fill", c).attr("opacity", .18);
+        bands.append("rect").attr("x", x0).attr("width", w).attr("y", 22).attr("height", TH - 44).style("fill", c).attr("opacity", .04);
+        if (w > e.name.length * 13 + 8) bands.append("text").attr("x", x0 + 5).attr("y", 15).style("fill", c).text(e.name);
+      });
+      const axis = tl.append("g").attr("class", "tl-axis").attr("transform", "translate(0," + (TH - 22) + ")");
+      d3.range(Math.ceil(Y0 / M.axisStep) * M.axisStep, Y1 + 1e-9, M.axisStep).forEach(v => {
+        axis.append("line").attr("x1", x(v)).attr("x2", x(v)).attr("y1", -(TH - 44)).attr("y2", 4).attr("stroke-opacity", .5);
+        axis.append("text").attr("x", x(v)).attr("y", 17).attr("text-anchor", "middle").text(v);
+      });
+
+      evG = tl.append("g").selectAll("g").data(pos).join("g")
+        .attr("class", "tl-ev").attr("tabindex", 0).attr("role", "button")
+        .attr("aria-label", d => M.events[d.i].when + " " + M.events[d.i].t)
+        .attr("transform", d => "translate(" + d.px + "," + (TOP + d.row * ROW_H) + ")")
+        .on("click", (_, d) => actions.select(d.i))
+        .on("keydown", (ev, d) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); actions.select(d.i); } });
+      evG.append("circle").attr("r", 5.5).style("fill", d => pcol(M.events[d.i].p));
+      evG.append("text").attr("x", d => d.flip ? -9 : 9).attr("y", 4).attr("text-anchor", d => d.flip ? "end" : "start").text(d => M.events[d.i].t);
+
+      cursorG = tl.append("g");
+      cursorG.append("line").attr("class", "cursor-line").attr("y1", 22).attr("y2", TH - 22);
+      cursorG.append("rect").attr("class", "cursor-hit").attr("x", -9).attr("width", 18).attr("y", 14).attr("height", TH - 36);
+      cursorG.append("circle").attr("class", "cursor-knob").attr("cy", 22).attr("r", 7);
+    }
+
+    mod.update = () => {
+      draw();
+      cursorG.attr("transform", "translate(" + x(state.year) + ",0)");
+      evG.classed("sel", d => d.i === state.sel);
+      tl.attr("aria-valuenow", Math.floor(state.year)).attr("aria-valuetext", yearText());
+    };
+
+    // 拖動紅線: 滑鼠可從時間軸任一處開始拖; 觸控只從紅線開始拖, 其他地方保留左右捲動
+    const yearAt = ev => x.invert(d3.pointer(ev, tl.node())[0]);
+    let dragging = false;
+    tl.on("pointerdown", ev => {
+      if (ev.target.closest(".tl-ev")) return;
+      if (ev.pointerType !== "mouse" && !ev.target.closest(".cursor-hit, .cursor-knob")) return;
+      dragging = true;
+      tl.classed("dragging", true);
+      tl.node().setPointerCapture(ev.pointerId);
+      actions.setYear(yearAt(ev));
+      ev.preventDefault();
+    });
+    tl.on("pointermove", ev => { if (dragging) actions.setYear(yearAt(ev)); });
+    const endDrag = () => { dragging = false; tl.classed("dragging", false); };
+    tl.on("pointerup", endDrag).on("pointercancel", endDrag);
+    tl.on("click", ev => {   // 觸控點一下跳到該年份
+      if (ev.pointerType === "mouse" || ev.target.closest(".tl-ev, .cursor-hit, .cursor-knob")) return;
+      actions.setYear(yearAt(ev));
+    });
+    new ResizeObserver(() => guard(mod, mod.update)).observe(el);
+    return mod;
+  }
+
+  // 6d. 政權狀態: 每個政權一列 (名稱, 控制比例長條, 狀態)
+  function createStatus() {
+    const el = $("status"), mod = { name: "政權狀態", el };
+    $("status-title").textContent = M.text.statusTitle;
+    $("bar-note").textContent = M.text.barNote;
+    const rows = M.polities.map(p => {
+      const row = document.createElement("div"), name = document.createElement("span"), bar = document.createElement("span"), fill = document.createElement("i"), chip = document.createElement("span");
+      row.className = "prow"; name.className = "name"; bar.className = "bar"; chip.className = "chip";
+      name.textContent = p.name;
+      name.style.color = pcol(p.id); fill.style.background = pcol(p.id);
+      bar.appendChild(fill); row.append(name, bar, chip);
+      $("polities").appendChild(row);
+      return { p, fill, chip };
+    });
+    mod.update = () => {
+      $("st-year").textContent = yearText();
+      rows.forEach(r => {
+        const [cls, text] = statusAt(r.p, state.year);
+        r.fill.style.width = Math.round(shareAt(r.p, state.year).s * 100) + "%";
+        r.chip.className = "chip " + cls;
+        r.chip.textContent = text;
+      });
+    };
+    return mod;
+  }
+
+  // 6e. 事件卡: 所有事件疊在同一格, 卡片高度固定為最長那則, 換事件時不跳動
+  function createCard() {
+    const el = $("evcard"), mod = { name: "事件卡", el };
+    const items = M.events.map(e => {
+      const it = document.createElement("div");
+      it.className = "ev-item off";
+      const yr = document.createElement("div");
+      yr.className = "ev-year";
+      yr.style.color = pcol(e.p);
+      yr.textContent = e.when;
+      const who = document.createElement("span");
+      who.className = "who";
+      who.style.background = pcol(e.p);
+      who.textContent = M.pol[e.p].name;
+      yr.appendChild(who);
+      const h = document.createElement("h3");
+      h.textContent = e.t;
+      const body = document.createElement("div");
+      body.className = "ev-body";
+      const ul = document.createElement("ul");
+      e.b.forEach(line => { const li = document.createElement("li"); li.textContent = line; ul.appendChild(li); });
+      body.appendChild(ul);
+      if (e.s) { const s = document.createElement("span"); s.className = "src-line"; s.textContent = "補充說明: " + e.s; body.appendChild(s); }
+      if (e.ref && e.ref.length) {
+        const refs = document.createElement("span");
+        refs.className = "src-line";
+        refs.append("出處: ");
+        e.ref.forEach(([url, label], i) => {
+          if (i) refs.append(" · ");
+          const a = document.createElement("a");
+          a.href = url; a.target = "_blank"; a.rel = "noopener"; a.textContent = label;
+          refs.appendChild(a);
+        });
+        body.appendChild(refs);
+      }
+      it.append(yr, h, body);
+      $("ev-stack").appendChild(it);
+      return it;
+    });
+    $("prev").onclick = () => actions.select(state.sel - 1);
+    $("next").onclick = () => actions.select(state.sel + 1);
+    mod.update = () => {
+      items.forEach((it, i) => it.classList.toggle("off", i !== state.sel));
+      $("ev-count").textContent = (state.sel + 1) + " / " + M.events.length;
+    };
+    return mod;
+  }
+
+  // 6f. 名稱開關: 每個類別一個按鈕
+  function createLayers() {
+    const el = $("layers"), mod = { name: "名稱開關", el };
+    const btns = d3.select(el).selectAll("button").data(M.kinds).join("button")
+      .attr("type", "button").text(k => k.label).on("click", (_, k) => actions.toggleKind(k.id));
+    mod.update = () => btns.attr("aria-pressed", k => !state.hidden.has(k.id));
+    return mod;
+  }
+
+  // ============ 7. 啟動 ============
+  [createPage, createMap, createTimeline, createStatus, createCard, createLayers].forEach(create => {
+    try { modules.push(create()); }
+    catch (err) { showBanner("模組無法啟動: " + create.name, [err.message + " (詳細內容見 console)"]); console.error(err); }
   });
-  tl.on("pointermove", ev => { if (dragging) setYear(yearAt(ev)); });
-  const endDrag = () => { dragging = false; tl.classed("dragging", false); };
-  tl.on("pointerup", endDrag).on("pointercancel", endDrag);
-  // 觸控點一下跳到該年份
-  tl.on("click", ev => {
-    if (ev.pointerType === "mouse" || ev.target.closest(".tl-ev, .cursor-hit, .cursor-knob")) return;
-    setYear(yearAt(ev));
-  });
+
   // 整頁通用按鍵: ← → 上一則/下一則, 1-9 跳到該則, 0 跳到最後一則
   document.addEventListener("keydown", ev => {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
     let i = null;
-    if (ev.key === "ArrowLeft") i = Math.max(0, sel - 1);
-    else if (ev.key === "ArrowRight") i = Math.min(EVENTS.length - 1, sel + 1);
+    if (ev.key === "ArrowLeft") i = state.sel - 1;
+    else if (ev.key === "ArrowRight") i = state.sel + 1;
     else if (/^[1-9]$/.test(ev.key)) i = Number(ev.key) - 1;
-    else if (ev.key === "0") i = EVENTS.length - 1;
+    else if (ev.key === "0") i = M.events.length - 1;
     if (i === null) return;
     ev.preventDefault();
-    select(i);
+    actions.select(i);
   });
-  document.getElementById("prev").onclick = () => select(Math.max(0, sel - 1));
-  document.getElementById("next").onclick = () => select(Math.min(EVENTS.length - 1, sel + 1));
 
   render();
-
-  if (window.LAND_TOPO) {
-    land = topojson.feature(window.LAND_TOPO, window.LAND_TOPO.objects.land);
-    drawMap();
-  } else {
-    const d = document.createElement("div");
-    d.className = "map-err";
-    d.textContent = "海岸線資料 land-10m-tw.js 載入失敗, 地圖只顯示地點與統治範圍.";
-    document.getElementById("mapbox").appendChild(d);
-  }
-
-  new ResizeObserver(() => drawMap()).observe(document.getElementById("mapbox"));
-  // 主題切換時重畫 (顏色由 CSS 變數計算)
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
 })();
 </script>
 </body>
