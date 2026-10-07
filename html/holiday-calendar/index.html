@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>放假日曆</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* 版面: 標題 + 工具列 (左: 格式分頁, 右: 日期排序) + 格式內容 (每個區塊有複製按鈕) + 資料來源 */
+:root {
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --ink: #2a2724;
+  --muted: #8a8378;
+  --line: #e3ded4;
+  --accent: #b0754f;
+  --err: #a5312b;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161514; --panel: #1f1d1b; --ink: #ebe7e1; --muted: #9a9389; --line: #36322e;
+    --accent: #d19670; --err: #e26b5f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161514; --panel: #1f1d1b; --ink: #ebe7e1; --muted: #9a9389; --line: #36322e;
+  --accent: #d19670; --err: #e26b5f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+/* 捲軸軌永遠保留: 分頁高度不同時, 捲軸出現/消失會讓置中內容左右跳動 */
+html { overflow-y: scroll; }
+body {
+  margin: 0 auto; max-width: 960px; padding: 32px 16px;
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.6 var(--font-body);
+}
+h1 { font-size: 24px; margin: 0 0 4px; }
+.meta { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+#banner { border: 1px solid var(--err); color: var(--err); background: var(--panel); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+#banner ul { margin: 4px 0 0; padding-left: 20px; }
+.mod-err { color: var(--err); font-size: 13px; padding: 8px 0; }
+
+/* 工具列: 分頁在左, 排序在右, 同一行; 窄螢幕時排序換到下一行 */
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.tabs, .sortbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tabs button {
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 6px 14px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px;
+}
+.tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sortbar { font-size: 13px; color: var(--muted); }
+.sortbar button {
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 3px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12px;
+}
+.sortbar button.active { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+.block { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+.block h3 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.copy {
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  border-radius: 8px; padding: 3px 12px; cursor: pointer; font: inherit; font-size: 12px; flex-shrink: 0;
+}
+.copy.done { background: var(--accent); color: #fff; border-color: var(--accent); }
+pre { margin: 0; overflow-x: auto; font: 13px/1.8 var(--font-data); white-space: pre; tab-size: 12; }
+
+.sources { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.sources h2 { font-size: 14px; margin: 0 0 6px; color: var(--ink); }
+.sources ul { margin: 0; padding-left: 20px; }
+.sources a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="banner" hidden></div>
+<h1 id="title"></h1>
+<div class="meta" id="meta"></div>
+<div class="toolbar">
+  <div class="tabs" id="tabs"></div>
+  <div class="sortbar" id="sortbar"></div>
+</div>
+<div id="panes"></div>
+<footer class="sources" id="sources" hidden></footer>
+
+<!-- 外部相依: 每個 <script> 標明它提供的全域變數 (data-global). 引擎一開始就檢查, 缺了就在頁面上列出檔案 -->
+<script src="data.js" data-global="HOLIDAY"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+
+  // ============ 1. 錯誤顯示 ============
+  function showBanner(title, lines) {
+    const box = $("banner");
+    const ul = el("ul");
+    lines.forEach(t => ul.appendChild(el("li", null, t)));
+    box.append(el("strong", null, title), ul);
+    box.hidden = false;
+    console.error(title, lines);
+  }
+  // 模組出錯時, 只在該模組的區塊顯示錯誤, 其他模組照常運作
+  function guard(mod, fn) {
+    try {
+      fn();
+    } catch (err) {
+      console.error("[" + mod.name + "]", err);
+      mod.el.replaceChildren(el("div", "mod-err", mod.name + " 出錯: " + err.message + " (詳細內容見 console)"));
+    }
+  }
+
+  // ============ 2. 外部相依 ============
+  const missing = [...document.querySelectorAll("script[data-global]")].filter(s => !window[s.dataset.global]);
+  if (missing.length) {
+    showBanner("缺少必要的檔案, 頁面無法運作. 請確認檔案和 index.html 放在同一個資料夾:",
+      missing.map(s => s.dataset.global + " <- " + s.getAttribute("src")));
+    return;
+  }
+
+  // ============ 3. 資料: 檢查並攤平 ============
+  const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + "T00:00:00Z"));
+
+  // 回傳 { model, errors }: 有錯的項目略過並列在 errors, 其餘照常顯示
+  function loadModel(H) {
+    if (!Array.isArray(H.regions) || !H.regions.length) throw new Error("regions 必須是非空陣列");
+    const errors = [];
+    const events = [];
+    H.regions.forEach((r, ri) => {
+      if (!r.name) { errors.push("regions[" + ri + "]: 缺少 name"); return; }
+      (r.events || []).forEach((e, ei) => {
+        const where = r.name + " events[" + ei + "]";
+        if (!isDate(e.date)) errors.push(where + ": date 要寫成 \"YYYY-MM-DD\", 現在是 " + JSON.stringify(e.date));
+        else if (!e.name) errors.push(where + ": 缺少 name");
+        else if (e.days !== undefined && !(Number.isInteger(e.days) && e.days >= 1)) errors.push(where + " " + e.name + ": days 要是 1 以上的整數");
+        else if (e.type !== undefined && e.type !== "info") errors.push(where + " " + e.name + ": type 只能是 \"info\" 或不寫");
+        else events.push({ region: r.name, prefix: r.prefix || "", order: ri, days: 1, ...e });
+      });
+    });
+    const sources = (H.sources || []).filter((s, i) => {
+      if (s && s.label && s.url) return true;
+      errors.push("sources[" + i + "]: 要有 label 和 url");
+      return false;
+    });
+    return {
+      model: { title: H.title || "放假日曆", updatedAt: H.updatedAt || "", regions: H.regions.map(r => r.name), events, sources },
+      errors
+    };
+  }
+
+  // ============ 4. 格式 (純計算: events + 排序方向 -> 文字) ============
+  // 日期工具一律用 UTC, 避免時區位移
+  const WD = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  const CN = "零一二三四五六七八九十";
+  const cn = n => (n >= 1 && n <= 10) ? CN[n] : String(n);
+  const day = (isoStr, off = 0) => { const d = new Date(isoStr + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + off); return d; };
+  const iso = d => d.toISOString().slice(0, 10);
+  const wd = d => WD[d.getUTCDay()];
+  const md = isoStr => { const [, m, dd] = isoStr.split("-"); return +m + "/" + +dd; };
+
+  const isInfo = e => e.type === "info";
+  const noted = e => e.name + (e.note ? " (" + e.note + ")" : "");
+  // 合併顯示時的地區前綴: 假期加 "{prefix}假期 ", 資訊日加 "{prefix} "
+  const prefixOf = (e, withRegion) => (!withRegion || !e.prefix) ? "" : e.prefix + (isInfo(e) ? " " : "假期 ");
+
+  // 排序: 日期 (依方向), 同一天依 regions 順序
+  const sorter = dir => (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) * dir || a.order - b.order;
+
+  const FORMATS = {
+    // TSV (日期 \t 星期 \t 說明), 逐日展開, 貼 Google Sheets 自動分欄. 連假第一天完整說明, 之後只寫名稱
+    tsv(evs, dir, withRegion) {
+      const rows = [];
+      evs.forEach(e => {
+        const n = isInfo(e) ? 1 : e.days;
+        for (let i = 0; i < n; i++) {
+          const text = i > 0 ? e.name
+            : isInfo(e) ? noted(e)
+            : noted(e) + " 放假" + cn(e.days) + "天";
+          rows.push({ date: iso(day(e.date, i)), order: e.order, line: [iso(day(e.date, i)), wd(day(e.date, i)), prefixOf(e, withRegion) + text].join("\t") });
+        }
+      });
+      return rows.sort(sorter(dir)).map(r => r.line).join("\n");
+    },
+    // 純文字 calendar: 一行一假期
+    calendar(evs, dir) {
+      return [...evs].sort(sorter(dir)).map(e => {
+        let label = prefixOf(e, true) + noted(e);
+        if (!isInfo(e)) {
+          label += " 放假" + e.days + "天";
+          if (e.days > 1) label += " " + md(e.date) + "~" + md(iso(day(e.date, e.days - 1)));
+        }
+        return e.date + "\t" + label;
+      }).join("\n");
+    },
+    // Markdown table: 一行一假期
+    markdown(evs, dir) {
+      const rows = [...evs].sort(sorter(dir)).map(e =>
+        [e.date, wd(day(e.date)), e.region, noted(e) + (isInfo(e) ? " (非假日)" : ""), isInfo(e) ? "-" : String(e.days)]);
+      return ["| 日期 | 星期 | 地區 | 說明 | 天數 |", "|---|---|---|---|---|",
+        ...rows.map(r => "| " + r.join(" | ") + " |")].join("\n");
+    }
+  };
+
+  // ============ 5. 狀態與動作 (模組之間只透過這裡溝通) ============
+  let M;
+  try {
+    const r = loadModel(window.HOLIDAY);
+    M = r.model;
+    if (r.errors.length) showBanner("資料有錯, 以下項目已略過 (請修改 data.js):", r.errors);
+  } catch (err) {
+    showBanner("data.js 的格式錯誤, 頁面無法運作:", [err.message]);
+    console.error(err);
+    return;
+  }
+
+  // 分頁: 每個分頁由哪些區塊組成
+  const TABS = [
+    { id: "tsv", label: "TSV (貼 Google Sheets)", blocks: dir => [
+        ["合併 (全部地區)", FORMATS.tsv(M.events, dir, true)],
+        ...M.regions.map(name => [name, FORMATS.tsv(M.events.filter(e => e.region === name), dir, false)])
+      ] },
+    { id: "calendar", label: "純文字 calendar", blocks: dir => [["全部", FORMATS.calendar(M.events, dir)]] },
+    { id: "markdown", label: "Markdown", blocks: dir => [["Markdown table", FORMATS.markdown(M.events, dir)]] }
+  ];
+  const SORTS = [{ dir: 1, label: "小到大" }, { dir: -1, label: "大到小" }];
+
+  const state = { tab: TABS[0].id, dir: 1 };
+  const actions = {
+    setTab(id) { state.tab = id; render(); },
+    setSort(dir) { state.dir = dir; render(); }
+  };
+
+  // ============ 6. 模組: 每個模組是 { name, el, update }, update 只讀 state ============
+  async function copyText(text, btn) {
+    try { await navigator.clipboard.writeText(text); }
+    catch (_) {
+      const ta = el("textarea"); ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+    }
+    btn.classList.add("done"); btn.textContent = "已複製 ✓";
+    setTimeout(() => { btn.classList.remove("done"); btn.textContent = "複製"; }, 1500);
+  }
+
+  // 一組互斥按鈕 (分頁 / 排序 共用)
+  function buttonGroup(name, box, items, isActive, onPick, lead) {
+    return {
+      name, el: box,
+      update() {
+        box.replaceChildren();
+        if (lead) box.appendChild(el("span", null, lead));
+        items.forEach(it => {
+          const b = el("button", isActive(it) ? "active" : null, it.label);
+          b.addEventListener("click", () => onPick(it));
+          box.appendChild(b);
+        });
+      }
+    };
+  }
+
+  const modules = [
+    { name: "標題", el: $("title"), update() {
+        document.title = M.title;
+        $("title").textContent = M.title;
+        $("meta").textContent = M.updatedAt ? "更新日期: " + M.updatedAt : "";
+      } },
+    buttonGroup("格式分頁", $("tabs"), TABS, t => t.id === state.tab, t => actions.setTab(t.id)),
+    buttonGroup("日期排序", $("sortbar"), SORTS, s => s.dir === state.dir, s => actions.setSort(s.dir), "日期排序:"),
+    { name: "格式內容", el: $("panes"), update() {
+        const tab = TABS.find(t => t.id === state.tab);
+        $("panes").replaceChildren(...tab.blocks(state.dir).map(([heading, text]) => {
+          const b = el("div", "block");
+          const h = el("h3", null, heading);
+          const btn = el("button", "copy", "複製");
+          btn.addEventListener("click", () => copyText(text, btn));
+          h.appendChild(btn);
+          b.append(h, el("pre", null, text));
+          return b;
+        }));
+      } },
+    { name: "資料來源", el: $("sources"), update() {
+        const box = $("sources");
+        box.hidden = !M.sources.length;
+        const ul = el("ul");
+        M.sources.forEach(s => {
+          const a = el("a", null, s.label); a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+          const li = el("li"); li.appendChild(a); ul.appendChild(li);
+        });
+        box.replaceChildren(el("h2", null, "資料來源"), ul);
+      } }
+  ];
+
+  function render() { modules.forEach(m => guard(m, () => m.update())); }
+
+  // ============ 7. 啟動 ============
+  render();
+})();
+</script>
+</body>
+</html>
