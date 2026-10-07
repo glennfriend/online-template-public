@@ -109,7 +109,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--warn);
 .status { padding-block: 12px; gap: 8px; }
 .status h3 .mono { color: var(--fall); }
 .polities { display: grid; gap: 3px; }
-.prow { display: grid; grid-template-columns: 70px 1fr 66px; gap: 8px; align-items: center; font-size: 13px; line-height: 1.5; }
+.prow { display: grid; grid-template-columns: 70px 1fr 44px; gap: 8px; align-items: center; font-size: 13px; line-height: 1.5; }
 .prow .name { font-weight: 700; }
 .prow .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .prow .bar i { display: block; height: 100%; border-radius: 4px; transition: width .3s; }
@@ -354,11 +354,11 @@ footer ul ul { margin-top: 4px; }
   }
   function statusAt(p, y) {
     const now = shareAt(p, y), later = shareAt(p, y + 10);
-    if (now.before) return ["none", "還沒來"];
-    if (y >= p.end) return ["gone", p.goneText || "已結束"];
-    if (later.s < now.s - .02) return ["down", "縮小中"];
-    if (later.s > now.s + .02) return ["up", "擴大中"];
-    return ["steady", "統治中"];
+    if (now.before) return ["none", "未到"];
+    if (y >= p.end) return ["gone", p.goneText || "結束"];
+    if (later.s < now.s - .02) return ["down", "縮小"];
+    if (later.s > now.s + .02) return ["up", "擴大"];
+    return ["steady", "統治"];
   }
   const areasAt = (p, y) => p.areas.filter(a => y >= a.from && y < a.to);
   const pcol = id => "var(--p-" + id + ")";
