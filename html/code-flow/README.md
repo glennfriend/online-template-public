@@ -5,10 +5,6 @@
 - hover 卡片看 "為什麼有這一步"、查證過的事實與來源; 點流程卡片, 圖上只留那條路
 - 範例資料: 結帳付款流程 (使用者 / Dev / 風險 三個視角)
 
-## Demo
-
-[HTML page](https://glennfriend.github.io/online-template-public/html/code-flow/)
-
 ## 技術細節
 
 [TECHNICAL.md](TECHNICAL.md)
