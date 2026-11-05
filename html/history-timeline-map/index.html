@@ -57,7 +57,7 @@ a { color: var(--steady); }
 .banner { border: 1px solid var(--fall); color: var(--fall); background: var(--panel); border-radius: 6px; padding: 10px 14px; font-size: 14px; }
 .banner ul { margin: 6px 0 0; padding-left: 20px; }
 .mod-err { position: relative; z-index: 3; margin: 8px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--fall); color: var(--fall); font-size: 13px; border-radius: 4px; }
-.map-warn { position: relative; z-index: 3; margin: 50px 10px 0; padding: 6px 10px; color: var(--fall); font-size: 13px; }
+.map-warn { max-width: 360px; padding: 4px 8px; background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--fall); border-radius: 4px; color: var(--fall); font-size: 12.5px; line-height: 1.45; }
 
 /* 一屏儀表板 */
 .dash { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0;
@@ -1032,7 +1032,7 @@ footer ul ul { margin-top: 4px; }
     let land = null;
     try { const topo = readJson(LAND_ID); land = topojson.feature(topo, topo.objects.land); }
     catch (err) { console.warn("[海岸線]", err.message); }
-    if (!land) { const w = el.appendChild(document.createElement("div")); w.className = "map-warn"; w.textContent = "海岸線資料區 #" + LAND_ID + " 讀取失敗, 地圖只顯示地點與統治範圍 (原因見 console)."; }
+    if (!land) { const w = el.querySelector(".map-tools").appendChild(document.createElement("div")); w.className = "map-warn"; w.textContent = "海岸線資料區 #" + LAND_ID + " 讀取失敗, 地圖只顯示地點與統治範圍 (原因見 console)."; }
     $("map-note").textContent = M.text.mapNote;
     const viewBtns = d3.select("#views").selectAll("button").data(M.map.views).join("button")
       .attr("type", "button").text(v => v.label).on("click", (_, v) => actions.setView(v.id));
