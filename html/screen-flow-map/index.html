@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Screen Flow Map</title>
+<!-- 網頁字型: 離線時載入失敗, 會退回 --f-body / --f-mono 裡的系統字型 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- ===================== 結構區 (CSS) ===================== -->
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* Layout: 每個故事 = 一排畫面框 (看得到什麼 / 可以做什麼), 箭頭寫按了什麼; 故事的條件與結果統一放在下方 */
+:root {
+  --bg: #eef1f0;
+  --surface: #ffffff;
+  --ink: #16211e;
+  --muted: #5d6c67;
+  --line: #d2dad7;
+  --accent: #1d5fbf;
+  --accent-soft: #e6eefb;
+  --ours: #0f766e;
+  --ours-soft: #e2f3f0;
+  --ext: #7a6f63;
+  --ext-soft: #efebe6;
+  --sys: #6b4fa0;
+  --sys-soft: #f0ebf8;
+  --gate: #a35a00;
+  --gate-soft: #fdf1df;
+  --bad: #b42318;
+  --bad-soft: #fdecea;
+  --f-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #101614; --surface: #19211f; --ink: #e3ebe8; --muted: #9aaaa5; --line: #2d3a36;
+  --accent: #8ab4ff; --accent-soft: #1a2c4a; --ours: #4fd1c0; --ours-soft: #11302b;
+  --ext: #c9b9a6; --ext-soft: #2b2723; --sys: #c3a8f0; --sys-soft: #2a2238;
+  --gate: #f2b057; --gate-soft: #3a2a12; --bad: #ff8a80; --bad-soft: #3b1c1a;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #101614; --surface: #19211f; --ink: #e3ebe8; --muted: #9aaaa5; --line: #2d3a36;
+  --accent: #8ab4ff; --accent-soft: #1a2c4a; --ours: #4fd1c0; --ours-soft: #11302b;
+  --ext: #c9b9a6; --ext-soft: #2b2723; --sys: #c3a8f0; --sys-soft: #2a2238;
+  --gate: #f2b057; --gate-soft: #3a2a12; --bad: #ff8a80; --bad-soft: #3b1c1a;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; margin: 0 }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 72px; overflow-x: clip;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 900; margin: 0 0 6px; text-wrap: balance }
+h2 { font-size: 22px; font-weight: 900; margin: 0 0 4px; text-wrap: balance }
+h3 { font-size: 17px; font-weight: 700; margin: 0; text-wrap: balance }
+p { margin: 0 }
+a { color: var(--accent) }
+code { font-family: var(--f-mono); font-size: .86em }
+.meta { color: var(--muted); font-size: 13px }
+.lead { max-width: 72ch; color: var(--muted) }
+section { margin-top: 40px }
+.sec-intro { color: var(--muted); max-width: 72ch; margin-bottom: 14px }
+.err { background: var(--bad-soft); color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; white-space: pre-wrap; font-family: var(--f-mono); font-size: 13px }
+
+/* 圖例: 5 種, 圖示樣式對應 legend[].kind */
+.howto { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 18px }
+.howto div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; display: flex; gap: 10px; align-items: flex-start }
+.howto .ico { flex: none; width: 44px; height: 30px; border-radius: 5px; border: 1.5px solid }
+.howto .ico.k-ext { border-color: var(--ext); border-style: dashed; background: var(--ext-soft) }
+.howto .ico.k-ours { border-color: var(--ours); background: var(--ours-soft) }
+.howto .ico.k-modal { border-color: var(--ours); border-style: double; border-width: 4px }
+.howto .ico.k-sys { border: 0; background: var(--sys-soft) }
+.howto .ico.k-gate { border: 0; border-left: 3px solid var(--gate); background: var(--gate-soft) }
+.howto b { display: block; font-size: 14px }
+
+/* 流程索引 */
+.idx { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px }
+.idx-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0 }
+.idx-box h3 { margin-bottom: 8px }
+.idx-row { display: grid; grid-template-columns: 9.5em 1fr; gap: 4px 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px }
+.idx-row:first-of-type { border-top: 0 }
+.idx-row .k { font-weight: 700 }
+.links { display: flex; flex-wrap: wrap; gap: 4px 6px }
+.sl { font-size: 13px; text-decoration: none; padding: 0 8px; border-radius: 99px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); white-space: nowrap }
+.sl:hover { border-color: var(--accent); color: var(--accent) }
+.sl b { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); margin-right: 4px; font-weight: 500 }
+
+/* 故事 */
+.group { margin-top: 36px }
+.story { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-top: 14px; min-width: 0; scroll-margin-top: 16px }
+.st-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap }
+.st-id { font-family: var(--f-mono); font-size: 12px; color: var(--surface); background: var(--ink); border-radius: 4px; padding: 0 6px }
+.lane { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 0; margin-top: 14px }
+
+/* 故事說明: 統一放下方, 同一種格式 */
+.facts { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px }
+.fact { display: grid; grid-template-columns: 5.5em 1fr; gap: 10px; font-size: 14px; max-width: 110ch }
+.fact .lb { font-weight: 700; color: var(--muted) }
+.fact .tx b { font-weight: 700 }
+.l { display: block }
+.issues li .l, .plain div .l { margin-top: 2px }
+
+/* 畫面框 */
+.scr { width: 232px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-content: start }
+.win, .bar { min-width: 0 }
+.cap { font-size: 14px; font-weight: 700; line-height: 1.35 }
+.cap small { display: block; font-weight: 400; color: var(--muted); font-size: 12px }
+.win { border: 1.5px solid var(--ours); border-radius: 8px; background: var(--surface); font-size: 13px; line-height: 1.5 }
+.bar { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: var(--ours-soft); border-bottom: 1px solid var(--line); border-radius: 6px 6px 0 0; position: relative }
+.dots { display: flex; gap: 3px } .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line) }
+.uw { flex: 1; min-width: 0; position: relative; display: flex }
+.url { flex: 1; min-width: 0; font: inherit; font-family: var(--f-mono); font-size: 10px; text-align: left; background: var(--surface); border: 1px solid transparent; border-radius: 4px; padding: 1px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); cursor: pointer }
+.url:focus-visible { outline: 2px solid var(--accent) }
+.full { display: none; position: absolute; left: 0; top: -1px; z-index: 20; width: max-content; min-width: 100%; max-width: min(460px, 86vw);
+  font-family: var(--f-mono); font-size: 11.5px; line-height: 1.45; word-break: break-all; text-align: left;
+  background: var(--surface); color: var(--ink); border: 1.5px solid var(--accent); border-radius: 4px; padding: 1px 6px; box-shadow: 0 6px 18px rgba(0,0,0,.18); cursor: pointer }
+.uw:hover .full, .url:focus-visible + .full { display: block }
+.back { position: fixed; z-index: 30; top: calc(env(safe-area-inset-top, 0px) + 16px); right: max(16px, env(safe-area-inset-right, 0px));
+  font: inherit; font-size: 14px; font-weight: 700; padding: 8px 14px; border-radius: 99px; border: 0; background: var(--accent); color: var(--surface); box-shadow: 0 6px 18px rgba(0,0,0,.22); cursor: pointer }
+.back:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px }
+.win.flash { outline: 3px solid var(--accent); outline-offset: 2px }
+.who { font-size: 10px; font-weight: 700; color: var(--ours); white-space: nowrap }
+.win.ext { border-color: var(--ext); border-style: dashed }
+.win.ext .bar { background: var(--ext-soft) }
+.win.ext .who { color: var(--ext) }
+.win.modal { border-style: double; border-width: 4px }
+.body { padding: 8px 10px 10px; display: grid; gap: 6px }
+.blk .h { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em }
+.blk ul { margin: 0; padding-left: 16px }
+.blk li { margin: 1px 0 }
+.blk li.pick { font-weight: 700; color: var(--accent); list-style: none; margin-left: -16px; padding-left: 16px; position: relative }
+.blk li.pick::before { content: "▶"; position: absolute; left: 1px; font-size: 10px; top: 3px }
+.side { display: grid; gap: 4px }
+.side div { font-size: 12.5px; line-height: 1.45; border-left: 3px solid var(--gate); background: var(--gate-soft); padding: 3px 7px; border-radius: 0 5px 5px 0 }
+.side b { color: var(--gate) }
+
+/* 箭頭 */
+.go { width: 104px; flex: none; display: grid; justify-items: center; align-content: start; gap: 3px; padding: 46px 6px 0; text-align: center; font-size: 12.5px; line-height: 1.35 }
+.go .ln { width: 100%; height: 2px; background: var(--ink); position: relative; margin: 4px 0 }
+.go .ln::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid var(--ink); border-right: 0 }
+.go .by { font-weight: 700; color: var(--accent) }
+.go .sys { color: var(--sys); background: var(--sys-soft); border-radius: 5px; padding: 2px 5px; font-size: 12px }
+.go .sys b { font-weight: 700 }
+
+/* 分岔 */
+.fork { width: 300px; max-width: 100%; flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-content: start }
+.fk { border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 13px; background: var(--surface) }
+.fk .if { color: var(--muted) }
+.fk .then { font-weight: 700 }
+.fk.badk { border-color: var(--bad); background: var(--bad-soft) }
+
+/* 參考資料 */
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-top: 12px }
+summary { cursor: pointer; padding: 12px 16px; font-weight: 700; font-size: 16px }
+summary:focus-visible, .sl:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+details > .in { padding: 0 16px 16px }
+.tbl { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 720px }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line) }
+th { font-size: 12.5px; color: var(--muted); font-weight: 500; background: var(--bg) }
+td:first-child { font-weight: 700; white-space: nowrap }
+.plain { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px }
+.plain div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px }
+.plain b { display: block; font-size: 15.5px }
+.issues { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none }
+.issues li { border: 1px solid var(--line); border-left: 4px solid var(--bad); border-radius: 6px; padding: 9px 13px; font-size: 14px }
+.issues li.q { border-left-color: var(--gate) }
+.issues b { display: block }
+
+/* 網址索引 */
+.uidx { display: grid; gap: 18px }
+.ug h3 { margin-bottom: 6px }
+.ur { display: grid; grid-template-columns: minmax(0, 20em) minmax(0, 1fr); gap: 4px 16px; padding: 8px 10px; border-top: 1px solid var(--line); font-size: 14px; border-radius: 6px; scroll-margin-top: 30vh }
+.ur:first-of-type { border-top: 0 }
+.ur .p { font-family: var(--f-mono); font-size: 12.5px; word-break: break-all; font-weight: 500 }
+.ur .tag { display: inline-block; margin-left: 6px; font-family: var(--f-body); font-size: 11px; font-weight: 700; color: var(--gate); background: var(--gate-soft); border-radius: 4px; padding: 0 5px; vertical-align: 1px }
+.ur .q { font-size: 13px; color: var(--muted); margin-top: 6px }
+.ur .qh { font-size: 11.5px; font-weight: 700; letter-spacing: .04em }
+.ur .q ul { margin: 2px 0 0; padding-left: 18px }
+.ur .q li { margin: 1px 0 }
+.ur .q code { color: var(--ink) }
+.ur .st { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px }
+.ur.flash { background: var(--accent-soft); outline: 2px solid var(--accent) }
+@media (max-width: 640px) { .ur { grid-template-columns: minmax(0, 1fr) } }
+@media (prefers-reduced-motion: no-preference) { .ur { transition: background .4s } }
+</style>
+</head>
+<body>
+<!-- ===================== 結構區 (HTML) =====================
+     只有空的容器, 文字全部由資料區填入. -->
+<div class="wrap">
+  <header>
+    <h1 id="page-h1"></h1>
+    <p class="lead" id="page-sub" hidden></p>
+    <div class="howto" id="legend"></div>
+  </header>
+
+  <section id="flow-index">
+    <h2 style="margin-bottom:14px" id="idx-title"></h2>
+    <div class="idx">
+      <div class="idx-box"><h3 id="idx-entry-title"></h3><div id="idx-entry"></div></div>
+      <div class="idx-box"><h3 id="idx-goal-title"></h3><div id="idx-goal"></div></div>
+    </div>
+  </section>
+
+  <div id="stories"></div>
+
+  <section id="reference">
+    <h2 id="ref-title"></h2>
+    <p class="sec-intro" id="ref-intro" hidden></p>
+    <div id="ref-body"></div>
+  </section>
+
+  <section id="url-index">
+    <h2 id="uidx-title"></h2>
+    <div class="uidx" id="uidx"></div>
+  </section>
+</div>
+
+<!-- ===================== 資料區 (開始) =====================
+     純 JSON, 沒有函式. 換主題只改這一段.
+     欄位說明見 TECHNICAL.md. 字串裡不要出現 "</script" 與 "<!--" (要寫就把 < 換成 <). -->
+<script type="application/json" id="screen-flow-data">
+{
+  "page": {
+    "title": "Cozy Mart 畫面流程地圖",
+    "h1": "Cozy Mart 畫面流程地圖",
+    "subtitle": "虛構的居家選物網站. 每個故事是一位顧客從進站到完成一件事, 依序走過的畫面."
+  },
+  "baseUrl": "www.cozymart.example",
+  "legend": [
+    { "kind": "ext", "title": "外部網站", "text": "虛線框. Instagram, Google, 合作部落格, 信箱, 銀行驗證頁." },
+    { "kind": "ours", "title": "我們的網站", "text": "實線框, 網址列是顧客看到的路徑." },
+    { "kind": "modal", "title": "彈出視窗", "text": "雙線框. 蓋在原頁面上的對話框." },
+    { "kind": "sys", "title": "系統自己做的事", "text": "寫在箭頭下方, 顧客看不到." },
+    { "kind": "gate", "title": "例外", "text": "畫面下方: 如果某情況, 會被帶去哪." }
+  ],
+  "sections": {
+    "index": "流程索引",
+    "indexByEntry": "依入口",
+    "indexByGoal": "依功能",
+    "reference": "參考資料",
+    "referenceIntro": "故事背後的規則. 需要時再展開.",
+    "urlIndex": "網址索引"
+  },
+  "groups": [
+    {
+      "title": "購買",
+      "intro": "從看到商品到付完錢. A 是最常見的一條路, 其他故事是路上會遇到的狀況.",
+      "stories": [
+        {
+          "id": "A",
+          "title": "從 Instagram 廣告進商品頁, 加入購物車並結帳",
+          "lane": [
+            { "s": "ext", "cap": "Instagram", "sub": "品牌廣告或網紅分享的貼文", "url": "www.instagram.com/p/{貼文 id}", "who": "外部網站",
+              "see": ["一張商品照: 亞麻床包組", "貼文附上商品連結"],
+              "can": ["點商品連結", "按讚, 留言"], "pick": "點商品連結" },
+            { "by": "點連結" },
+            { "s": "page", "cap": "商品頁", "sub": "所有分享連結都落在這裡", "url": "www.cozymart.example/products/{商品 id}?ref=ig",
+              "see": ["商品名稱, 價格, 評價", "顏色與尺寸選項", "庫存: 現貨 / 只剩 3 件"],
+              "can": ["加入購物車", "立即購買", "加入願望清單"], "pick": "加入購物車",
+              "side": [["未登入", "先跳登入視窗, 登入後自動加入"]] },
+            { "by": "按加入購物車" },
+            { "s": "modal", "cap": "登入視窗", "sub": "只有未登入時出現", "url": "www.cozymart.example/products/{商品 id}?ref=ig",
+              "see": ["Email 與密碼欄位", "用 Google 帳號登入"],
+              "can": ["登入", "還沒有帳號? 註冊 (故事 G)"], "pick": "登入",
+              "side": [["忘記密碼", "帶去重設密碼 (故事 H)"]] },
+            { "by": "登入成功", "sys": "把商品放進購物車" },
+            { "s": "page", "cap": "購物車", "url": "www.cozymart.example/cart",
+              "see": ["商品清單與小計", "運費: 滿 NT$1,000 免運", "下方 你可能也喜歡"],
+              "can": ["改數量, 刪除", "輸入優惠碼 (故事 C)", "前往結帳"], "pick": "前往結帳" },
+            { "by": "按前往結帳", "sys": "預留庫存 15 分鐘" },
+            { "s": "page", "cap": "結帳", "sub": "確認頁", "url": "www.cozymart.example/checkout?step=review",
+              "see": ["收件人與地址 (帶入上次的)", "運送方式, 付款方式", "訂單總額"],
+              "can": ["修改地址", "選付款方式", "確認付款"], "pick": "確認付款",
+              "side": [["還沒有收件地址", "先去補地址 (故事 A2)"], ["付款沒過", "3D 驗證或換卡 (故事 D)"]] },
+            { "by": "按確認付款", "sys": "扣款, 建立訂單, 寄確認信" },
+            { "s": "page", "cap": "訂單完成", "url": "www.cozymart.example/checkout/complete/{訂單編號}",
+              "see": ["訂單編號", "預計到貨日", "提示: 確認信已寄出"],
+              "can": ["查看訂單 (故事 J)", "繼續逛"] }
+          ],
+          "cond": "任何人都看得到商品頁. 加入購物車要登入, 沒登入會先跳登入視窗.",
+          "done": "訂單成立, 付款完成. 訂單出現在 我的訂單.",
+          "next": "到 我的訂單 看出貨進度 (故事 J), 或繼續逛.",
+          "note": "<b>預留庫存</b>按 前往結帳 時, 系統先替顧客保留商品 15 分鐘. 時間到還沒付款, 商品放回庫存; 結帳頁會提示 \"部分商品已售完\"."
+        },
+        {
+          "id": "A2",
+          "title": "結帳時資料不齊, 先補收件地址",
+          "lane": [
+            { "s": "page", "cap": "結帳", "sub": "還沒有收件地址", "url": "www.cozymart.example/checkout?step=review",
+              "see": ["紅字: 請先填寫收件地址", "確認付款 按鈕是灰的"],
+              "can": ["新增收件地址"], "pick": "新增收件地址" },
+            { "by": "按新增收件地址" },
+            { "s": "page", "cap": "填寫收件地址", "url": "www.cozymart.example/checkout/address",
+              "see": ["收件人, 手機, 地址欄位", "也可以選超商取貨"],
+              "can": ["填好並儲存", "勾選 設為預設地址"], "pick": "填好並儲存",
+              "side": [["手機格式不對", "欄位下方紅字, 不能儲存"], ["地址不在配送範圍", "提示改選超商取貨"]] },
+            { "by": "按儲存", "sys": "檢查地址, 重算運費" },
+            { "s": "page", "cap": "結帳", "sub": "回到原本的確認頁", "url": "www.cozymart.example/checkout?step=review",
+              "see": ["剛填的地址", "更新後的運費"],
+              "can": ["確認付款"], "pick": "確認付款" }
+          ],
+          "cond": "從故事 A 的結帳頁進來. 第一次買東西, 或帳號裡沒有預設地址.",
+          "done": "地址存進帳號的地址簿, 回到結帳頁.",
+          "next": "回故事 A, 按確認付款.",
+          "note": "下次結帳會自動帶入預設地址; 地址簿在 我的帳號 裡管理."
+        },
+        {
+          "id": "B",
+          "title": "從 Google 搜尋進搜尋頁, 缺貨時設到貨通知",
+          "lane": [
+            { "s": "ext", "cap": "Google 搜尋", "url": "www.google.com/search?q=亞麻床包", "who": "外部網站",
+              "see": ["搜尋結果裡 Cozy Mart 的商品列表"],
+              "can": ["點搜尋結果"], "pick": "點搜尋結果" },
+            { "by": "點搜尋結果" },
+            { "s": "page", "cap": "搜尋結果頁", "url": "www.cozymart.example/search?q=亞麻床包",
+              "see": ["符合的商品卡片", "篩選: 價格, 顏色, 只看有貨"],
+              "can": ["點商品卡片", "改排序或篩選"], "pick": "點商品卡片" },
+            { "by": "點商品卡片" },
+            { "fork": "商品頁依庫存決定按鈕", "items": [
+              ["有庫存", "顯示 加入購物車 (同故事 A)"],
+              ["只有部分顏色缺貨", "缺貨的顏色變灰, 換一個顏色就能買"],
+              ["全部缺貨", "按鈕變成 到貨通知我"]
+            ] },
+            { "by": "按到貨通知我" },
+            { "s": "modal", "cap": "到貨通知視窗", "url": "www.cozymart.example/products/{商品 id}",
+              "see": ["要通知的顏色與尺寸", "通知會寄到帳號的 Email"],
+              "can": ["確認通知", "取消"], "pick": "確認通知",
+              "side": [["未登入", "先跳登入視窗 (同故事 A)"]] },
+            { "by": "按確認通知", "sys": "登記到貨通知, 補貨時寄信" },
+            { "s": "page", "cap": "商品頁", "sub": "按鈕變成 已設定通知", "url": "www.cozymart.example/products/{商品 id}",
+              "see": ["提示: 補貨時會寄信給你", "相似商品推薦"],
+              "can": ["看相似商品", "到願望清單管理通知"] }
+          ],
+          "cond": "從搜尋引擎進站的人通常落在搜尋結果頁. 設到貨通知要登入.",
+          "done": "到貨通知登記完成, 補貨時收到信.",
+          "next": "收到到貨信後點 立即購買 (故事 N), 或先看相似商品.",
+          "note": "<b>只看有貨</b>搜尋頁預設不勾. 從 Google 進來的人常直接點到缺貨商品, 所以缺貨頁一定要有下一步."
+        },
+        {
+          "id": "C",
+          "title": "在購物車使用優惠碼",
+          "lane": [
+            { "s": "page", "cap": "購物車", "url": "www.cozymart.example/cart",
+              "see": ["商品清單與小計", "優惠碼欄位"],
+              "can": ["輸入優惠碼", "前往結帳"], "pick": "輸入優惠碼" },
+            { "by": "輸入後按套用" },
+            { "fork": "系統檢查優惠碼", "items": [
+              ["有效, 也達到門檻", "小計扣掉折扣, 顯示 已套用"],
+              ["過期或打錯", "欄位下方紅字: 優惠碼無效"],
+              ["還沒到門檻", "提示 再買 NT$120 就能用, 附加購推薦"]
+            ] },
+            { "by": "套用成功", "sys": "鎖定這組優惠碼, 計算折扣" },
+            { "s": "page", "cap": "購物車", "sub": "已套用優惠", "url": "www.cozymart.example/cart?coupon=WELCOME100",
+              "see": ["已套用: WELCOME100", "折扣後的小計"],
+              "can": ["移除優惠碼", "前往結帳"], "pick": "前往結帳",
+              "side": [["再輸入另一組", "新的會取代舊的, 一次只能用一組"]] },
+            { "by": "按前往結帳" },
+            { "s": "page", "cap": "結帳", "url": "www.cozymart.example/checkout?step=review",
+              "see": ["訂單總額已扣掉折扣"],
+              "can": ["確認付款 (故事 A)"] }
+          ],
+          "cond": "已登入, 購物車裡有商品.",
+          "done": "優惠碼套用在這筆訂單.",
+          "next": "回故事 A 結帳.",
+          "note": "優惠碼在付款成功時才算用掉; 中途離開, 優惠碼還能再用."
+        },
+        {
+          "id": "D",
+          "title": "付款沒過: 3D 驗證與換卡",
+          "lane": [
+            { "s": "page", "cap": "付款頁", "url": "www.cozymart.example/checkout/payment",
+              "see": ["信用卡欄位", "已存的卡片"],
+              "can": ["輸入卡號", "選已存的卡", "確認付款"], "pick": "確認付款" },
+            { "by": "按確認付款", "sys": "向發卡銀行要求 3D 驗證" },
+            { "s": "modal", "cap": "3D 驗證視窗", "sub": "蓋在付款頁上", "url": "www.cozymart.example/checkout/payment",
+              "see": ["說明: 銀行要確認是你本人"],
+              "can": ["前往銀行驗證", "取消"], "pick": "前往銀行驗證" },
+            { "by": "前往驗證" },
+            { "s": "ext", "cap": "銀行驗證頁", "sub": "發卡銀行的頁面", "url": "secure.examplebank.example/3ds/{驗證 id}", "who": "外部網站",
+              "see": ["發卡銀行的標誌", "簡訊驗證碼欄位"],
+              "can": ["輸入驗證碼", "重寄簡訊"], "pick": "輸入驗證碼",
+              "side": [["驗證碼輸錯 3 次", "交易取消, 回付款頁"]] },
+            { "by": "驗證通過", "sys": "扣款" },
+            { "fork": "扣款結果", "items": [
+              ["成功", "到訂單完成頁 (同故事 A)"],
+              ["額度不足或卡片被拒", "回付款頁, 顯示 付款失敗, 請換一張卡"],
+              ["驗證逾時", "回付款頁, 可以再試一次"]
+            ] },
+            { "by": "換一張卡" },
+            { "s": "page", "cap": "付款頁", "sub": "購物車和地址都保留", "url": "www.cozymart.example/checkout/payment?retry=1",
+              "see": ["紅字: 付款失敗", "剛才的訂單內容"],
+              "can": ["換卡再試", "改用貨到付款"], "pick": "換卡再試" }
+          ],
+          "cond": "選信用卡付款, 發卡銀行要求 3D 驗證時才會看到驗證視窗.",
+          "done": "換卡後付款成功, 到訂單完成頁.",
+          "next": "同故事 A 的訂單完成.",
+          "note": "付款失敗不會清空購物車; 預留庫存的 15 分鐘從第一次按 前往結帳 開始算, 換卡不會重算."
+        },
+        {
+          "id": "E",
+          "title": "推薦商品卡片, 一鍵加入購物車",
+          "lane": [
+            { "s": "page", "cap": "購物車", "sub": "下方 你可能也喜歡", "url": "www.cozymart.example/cart",
+              "see": ["4 張推薦商品卡片", "卡片右下的 + 加入"],
+              "can": ["按 + 加入", "點卡片看商品頁"], "pick": "按 + 加入" },
+            { "by": "按 + 加入" },
+            { "fork": "系統依商品決定怎麼加入", "items": [
+              ["只有一種規格", "直接加入, 卡片變成 已加入"],
+              ["有顏色或尺寸要選", "跳出選規格視窗, 選完才加入"],
+              ["已經缺貨", "按鈕變成 到貨通知 (同故事 B)"]
+            ] },
+            { "by": "有規格要選" },
+            { "s": "modal", "cap": "選擇規格", "url": "www.cozymart.example/cart",
+              "see": ["顏色, 尺寸選項", "價格隨規格變動"],
+              "can": ["選好後加入", "取消"], "pick": "選好後加入" },
+            { "by": "按加入", "sys": "加入購物車, 重算運費" },
+            { "s": "page", "cap": "購物車", "sub": "小計更新", "url": "www.cozymart.example/cart",
+              "see": ["新商品出現在清單裡", "提示: 已達免運門檻"],
+              "can": ["前往結帳 (故事 A)"] }
+          ],
+          "cond": "購物車裡至少有一件商品, 才會出現推薦區.",
+          "done": "推薦商品加進購物車, 留在原頁.",
+          "next": "繼續逛, 或前往結帳 (故事 A).",
+          "note": "推薦依購物車內容挑選, 不推已經在購物車裡的商品."
+        },
+        {
+          "id": "F",
+          "title": "願望清單全部加入購物車",
+          "lane": [
+            { "s": "page", "cap": "願望清單", "url": "www.cozymart.example/wishlist",
+              "see": ["收藏的商品", "每件的庫存與目前價格", "降價的商品有 降價 標記"],
+              "can": ["全部加入購物車", "單件加入", "移除"], "pick": "全部加入購物車" },
+            { "by": "按全部加入購物車" },
+            { "s": "modal", "cap": "確認視窗", "sub": "有商品加不進去時才出現", "url": "www.cozymart.example/wishlist",
+              "see": ["可以加入 5 件, 缺貨 1 件"],
+              "can": ["加入可買的 5 件", "取消"], "pick": "加入可買的 5 件",
+              "side": [["全部都有貨", "不跳視窗, 直接加入"]] },
+            { "by": "按確認", "sys": "一次加入購物車, 缺貨的留在清單" },
+            { "s": "page", "cap": "購物車", "url": "www.cozymart.example/cart",
+              "see": ["剛加入的 5 件商品", "小計與運費"],
+              "can": ["前往結帳 (故事 A)"] }
+          ],
+          "cond": "已登入. 願望清單只存在帳號裡, 沒登入看不到.",
+          "done": "有貨的商品進了購物車, 缺貨的還在願望清單.",
+          "next": "前往結帳 (故事 A).",
+          "note": "加入購物車後, 商品不會從願望清單移除; 要顧客自己刪."
+        }
+      ]
+    },
+    {
+      "title": "帳號",
+      "intro": "註冊, 忘記密碼, 登入後去哪. 很多購買故事會從這裡繞一下再回去.",
+      "stories": [
+        {
+          "id": "G",
+          "title": "第一次註冊, 三個步驟",
+          "lane": [
+            { "s": "page", "cap": "首頁", "url": "www.cozymart.example/",
+              "see": ["本週主打商品", "右上角 登入 / 註冊"],
+              "can": ["註冊", "逛分類"], "pick": "註冊" },
+            { "by": "按註冊" },
+            { "s": "page", "cap": "註冊", "sub": "第 1 步: 帳號", "url": "www.cozymart.example/register?step=1",
+              "see": ["Email, 密碼欄位", "用 Google 帳號註冊"],
+              "can": ["下一步"], "pick": "下一步",
+              "side": [["Email 已經註冊過", "提示改去登入 (故事 I)"]] },
+            { "by": "按下一步", "sys": "寄出 Email 驗證碼" },
+            { "s": "page", "cap": "註冊", "sub": "第 2 步: 驗證 Email", "url": "www.cozymart.example/register?step=2",
+              "see": ["6 位數驗證碼欄位", "60 秒後可以重寄"],
+              "can": ["輸入驗證碼"], "pick": "輸入驗證碼",
+              "side": [["驗證碼過期", "按重寄, 舊的作廢"]] },
+            { "by": "驗證成功" },
+            { "s": "page", "cap": "註冊", "sub": "第 3 步: 喜好 (可略過)", "url": "www.cozymart.example/register?step=3",
+              "see": ["感興趣的分類: 寢具, 廚房, 香氛, 收納"],
+              "can": ["選分類並完成", "略過"], "pick": "選分類並完成" },
+            { "by": "按完成", "sys": "建立帳號, 發新會員優惠券" },
+            { "s": "page", "cap": "首頁", "sub": "已登入", "url": "www.cozymart.example/",
+              "see": ["歡迎提示與 NT$100 新會員優惠券", "依喜好排的推薦商品"],
+              "can": ["開始逛", "到我的帳號"] }
+          ],
+          "cond": "還沒有帳號. 從首頁, 登入視窗或廣告活動頁都能進註冊.",
+          "done": "帳號建立, 自動登入, 拿到新會員優惠券.",
+          "next": "回首頁逛, 或回到原本要買的商品 (故事 A).",
+          "note": "<b>用 Google 帳號註冊</b>會跳過第 2 步, 因為 Email 已經由 Google 驗證過."
+        },
+        {
+          "id": "H",
+          "title": "忘記密碼, 用 Email 重設",
+          "lane": [
+            { "s": "page", "cap": "登入頁", "url": "www.cozymart.example/login",
+              "see": ["Email 與密碼欄位"],
+              "can": ["登入", "忘記密碼?"], "pick": "忘記密碼?" },
+            { "by": "點忘記密碼" },
+            { "s": "page", "cap": "忘記密碼", "url": "www.cozymart.example/forgot-password",
+              "see": ["Email 欄位"],
+              "can": ["寄出重設信"], "pick": "寄出重設信" },
+            { "by": "按寄出", "sys": "寄出重設連結 (30 分鐘內有效)" },
+            { "s": "ext", "cap": "信箱", "url": "mail.example.com/inbox/{信件 id}", "who": "外部網站",
+              "see": ["主旨: 重設你的 Cozy Mart 密碼"],
+              "can": ["點 重設密碼 按鈕"], "pick": "點 重設密碼 按鈕" },
+            { "by": "點連結" },
+            { "s": "page", "cap": "設定新密碼", "url": "www.cozymart.example/reset-password?token={token}",
+              "see": ["新密碼, 再輸入一次"],
+              "can": ["儲存新密碼"], "pick": "儲存新密碼",
+              "side": [["連結過期或已經用過", "顯示 連結已失效, 可以重寄"]] },
+            { "by": "按儲存", "sys": "更新密碼, 登出其他裝置" },
+            { "s": "page", "cap": "登入頁", "sub": "上方提示 密碼已更新", "url": "www.cozymart.example/login",
+              "see": ["綠色提示: 請用新密碼登入"],
+              "can": ["用新密碼登入 (故事 I)"] }
+          ],
+          "cond": "有帳號但忘了密碼. 用 Google 帳號註冊的人沒有密碼, 會被提示改用 Google 登入.",
+          "done": "密碼更新, 其他裝置被登出.",
+          "next": "用新密碼登入 (故事 I).",
+          "note": "為了安全, 不管 Email 有沒有註冊, 畫面都說 \"如果這個 Email 有帳號, 我們已經寄出信\"."
+        },
+        {
+          "id": "I",
+          "title": "登入後會被帶去哪",
+          "lane": [
+            { "s": "page", "cap": "登入頁", "url": "www.cozymart.example/login?next=/wishlist",
+              "see": ["Email 與密碼欄位", "用 Google 帳號登入"],
+              "can": ["登入"], "pick": "登入" },
+            { "by": "登入成功" },
+            { "fork": "登入後落點", "items": [
+              ["網址帶 next (例如被擋下來時)", "回到原本要去的頁"],
+              ["購物車裡有商品", "購物車"],
+              ["其他情況", "首頁"],
+              ["從結帳頁的登入視窗登入", "不管購物車, 一律回首頁, 結帳要重來", "bad"]
+            ] },
+            { "s": "page", "cap": "願望清單", "sub": "這個例子帶了 next", "url": "www.cozymart.example/wishlist",
+              "see": ["收藏的商品"],
+              "can": ["全部加入購物車 (故事 F)"] }
+          ],
+          "cond": "任何登入方式: 登入頁, 登入視窗, Google 帳號.",
+          "done": "登入完成, 依上面的規則落在某一頁.",
+          "next": "依落點繼續原本的事.",
+          "note": "<b>紅色那一條</b>和其他入口不一致, 見參考資料的問題清單."
+        }
+      ]
+    },
+    {
+      "title": "訂單",
+      "intro": "付完錢之後的事: 看出貨進度, 申請退貨.",
+      "stories": [
+        {
+          "id": "J",
+          "title": "查訂單, 申請退貨",
+          "lane": [
+            { "s": "page", "cap": "我的帳號", "url": "www.cozymart.example/account",
+              "see": ["會員等級, 優惠券", "最近一筆訂單"],
+              "can": ["我的訂單", "地址簿", "會員管理"], "pick": "我的訂單" },
+            { "by": "點我的訂單" },
+            { "s": "page", "cap": "我的訂單", "url": "www.cozymart.example/account/orders",
+              "see": ["訂單清單: 日期, 金額, 狀態", "篩選: 處理中 / 已出貨 / 已完成"],
+              "can": ["點一筆訂單"], "pick": "點一筆訂單" },
+            { "by": "點訂單" },
+            { "s": "page", "cap": "訂單明細", "url": "www.cozymart.example/account/orders/{訂單編號}",
+              "see": ["商品明細", "物流進度", "電子發票"],
+              "can": ["申請退貨", "聯絡客服"], "pick": "申請退貨",
+              "side": [["超過 7 天鑑賞期", "不顯示退貨按鈕, 只能聯絡客服"]] },
+            { "by": "按申請退貨" },
+            { "s": "page", "cap": "申請退貨", "url": "www.cozymart.example/account/orders/{訂單編號}/return",
+              "see": ["勾選要退的商品", "退貨原因", "退款方式: 原卡退回 / 購物金"],
+              "can": ["送出退貨申請"], "pick": "送出退貨申請" },
+            { "by": "按送出", "sys": "建立退貨單, 通知物流到府收件" },
+            { "s": "page", "cap": "訂單明細", "sub": "狀態: 退貨處理中", "url": "www.cozymart.example/account/orders/{訂單編號}",
+              "see": ["退貨單號", "預計收件日"],
+              "can": ["取消退貨申請"] }
+          ],
+          "cond": "已登入, 訂單已出貨或已送達.",
+          "done": "退貨單建立, 物流會來收件.",
+          "next": "倉庫收到商品後退款, 會寄信通知.",
+          "note": "<b>退款時間</b>原卡退回約 7 到 14 天; 選購物金是倉庫驗貨後立刻入帳."
+        }
+      ]
+    },
+    {
+      "title": "付費會員",
+      "intro": "Plus 會員每月 NT$99, 不限次數免運. 這裡是加入和取消的流程.",
+      "stories": [
+        {
+          "id": "K",
+          "title": "免運次數用完, 升級 Plus 會員",
+          "lane": [
+            { "s": "page", "cap": "購物車", "sub": "這個月的免運用完了", "url": "www.cozymart.example/cart",
+              "see": ["提示: 本月 2 次免運已用完", "運費 NT$80"],
+              "can": ["了解 Plus 會員", "照付運費結帳"], "pick": "了解 Plus 會員" },
+            { "by": "點了解 Plus" },
+            { "s": "modal", "cap": "Plus 升級說明", "url": "www.cozymart.example/cart",
+              "see": ["Plus 會員: 每月 NT$99", "不限次數免運, 會員價, 優先出貨"],
+              "can": ["升級 Plus", "先不要"], "pick": "升級 Plus",
+              "side": [["按先不要", "關掉視窗, 照付運費"]] },
+            { "by": "按升級 Plus" },
+            { "s": "page", "cap": "Plus 付款", "url": "www.cozymart.example/plus/checkout?plan=monthly",
+              "see": ["月繳 / 年繳 (年繳省 2 個月)", "已存的卡片"],
+              "can": ["確認訂閱"], "pick": "確認訂閱",
+              "side": [["付款沒過", "同故事 D 的換卡"]] },
+            { "by": "按確認訂閱", "sys": "扣款, 開通 Plus, 這筆訂單改成免運" },
+            { "s": "page", "cap": "購物車", "sub": "運費變成 0", "url": "www.cozymart.example/cart",
+              "see": ["Plus 標章", "運費 NT$0"],
+              "can": ["前往結帳 (故事 A)"] }
+          ],
+          "cond": "一般會員每月有 2 次免運; 第 3 筆訂單起在購物車看到提示.",
+          "done": "成為 Plus 會員, 這筆訂單免運.",
+          "next": "回購物車結帳 (故事 A).",
+          "note": "也可以從 <code>/plus</code> 介紹頁直接加入, 付款頁相同."
+        },
+        {
+          "id": "L",
+          "title": "取消 Plus 會員, 中途有挽留優惠",
+          "lane": [
+            { "s": "page", "cap": "會員管理", "url": "www.cozymart.example/account/membership",
+              "see": ["方案: Plus 月繳", "下次扣款日", "這個月省下的運費"],
+              "can": ["取消 Plus"], "pick": "取消 Plus" },
+            { "by": "按取消 Plus" },
+            { "s": "modal", "cap": "取消原因", "url": "www.cozymart.example/account/membership/cancel",
+              "see": ["為什麼要取消? (單選)"],
+              "can": ["選原因並繼續", "保留會員"], "pick": "選原因並繼續" },
+            { "by": "選原因, 按繼續" },
+            { "s": "modal", "cap": "挽留優惠", "url": "www.cozymart.example/account/membership/cancel?step=offer",
+              "see": ["下個月半價 NT$49"],
+              "can": ["接受優惠", "仍要取消"], "pick": "仍要取消",
+              "side": [["按接受優惠", "保留會員, 下期半價"], ["曾經取消過又重新訂閱", "疑似不出現這個視窗 (見參考資料)"]] },
+            { "by": "按仍要取消", "sys": "設定到期日, 之後不再扣款" },
+            { "s": "page", "cap": "會員管理", "sub": "顯示 到期後取消", "url": "www.cozymart.example/account/membership",
+              "see": ["Plus 用到 12/05 為止", "到期前仍然免運"],
+              "can": ["恢復會員"] }
+          ],
+          "cond": "Plus 會員, 已登入.",
+          "done": "到期後不再扣款; 到期前權益照舊.",
+          "next": "到期前隨時可以按 恢復會員.",
+          "note": "<b>取消不退費</b>已經付的這一期用到結束, 不按天數退錢."
+        }
+      ]
+    },
+    {
+      "title": "廣告與其他入口",
+      "intro": "不是從首頁進來的人. 每個入口落在哪一頁, 第一眼看到什麼.",
+      "stories": [
+        {
+          "id": "M",
+          "title": "限時折扣廣告, 註冊後拿優惠券",
+          "lane": [
+            { "s": "ext", "cap": "Facebook 廣告", "sub": "動態上的贊助貼文", "url": "www.facebook.com/{粉專}/posts/{貼文 id}", "who": "外部網站",
+              "see": ["限時 48 小時, 全館 8 折"],
+              "can": ["點 立即搶購"], "pick": "點 立即搶購" },
+            { "by": "點立即搶購" },
+            { "s": "page", "cap": "活動頁", "url": "www.cozymart.example/lp/flash-sale?campaign=nov-sale",
+              "see": ["倒數計時", "3 件主打商品", "新會員再折 NT$150"],
+              "can": ["領取優惠", "直接看商品"], "pick": "領取優惠" },
+            { "by": "按領取優惠" },
+            { "s": "page", "cap": "快速註冊", "sub": "只要 Email 和密碼", "url": "www.cozymart.example/lp/flash-sale/register",
+              "see": ["Email, 密碼欄位"],
+              "can": ["註冊並領取"], "pick": "註冊並領取",
+              "side": [["已經有帳號", "改成登入, 登入後一樣發券"]] },
+            { "by": "按註冊", "sys": "建立帳號, 發優惠券 (48 小時有效)" },
+            { "s": "page", "cap": "領取成功", "url": "www.cozymart.example/lp/flash-sale/coupon",
+              "see": ["優惠券代碼", "倒數 48 小時"],
+              "can": ["去購物"], "pick": "去購物" },
+            { "by": "點去購物" },
+            { "s": "page", "cap": "商品頁", "sub": "優惠已自動帶入", "url": "www.cozymart.example/products/{商品 id}?utm_source=facebook",
+              "see": ["價格旁顯示 優惠價"],
+              "can": ["加入購物車 (故事 A)"] }
+          ],
+          "cond": "活動期間才有; 活動結束後 <code>/lp/flash-sale</code> 會轉回首頁.",
+          "done": "新帳號建立, 優惠券在帳號裡.",
+          "next": "加入購物車並結帳 (故事 A).",
+          "note": "快速註冊沒有喜好步驟, 和故事 G 不同; 之後可以在我的帳號補."
+        },
+        {
+          "id": "N",
+          "title": "從 Email 回到網站",
+          "lane": [
+            { "s": "ext", "cap": "信箱", "sub": "Cozy Mart 寄出的信", "url": "mail.example.com/inbox/{信件 id}", "who": "外部網站",
+              "see": ["訂單, 出貨, 到貨, 購物車提醒, 電子報"],
+              "can": ["點信裡的按鈕"], "pick": "點信裡的按鈕" },
+            { "by": "點按鈕" },
+            { "fork": "每封信連到哪", "items": [
+              ["訂單確認信 查看訂單", "訂單明細 (故事 J)"],
+              ["出貨通知信 追蹤包裹", "物流公司的追蹤頁"],
+              ["到貨通知信 立即購買", "商品頁 (故事 B)"],
+              ["購物車提醒信 回到購物車", "購物車 (故事 A)"],
+              ["重設密碼信", "設定新密碼 (故事 H)"],
+              ["電子報 取消訂閱", "舊網址 /unsubscribe, 頁面已經移除", "bad"]
+            ] },
+            { "by": "以訂單確認信為例" },
+            { "s": "page", "cap": "訂單明細", "url": "www.cozymart.example/account/orders/{訂單編號}?utm_source=email",
+              "see": ["這筆訂單的商品與物流進度"],
+              "can": ["申請退貨 (故事 J)"],
+              "side": [["沒登入", "先登入, 登入後回到這頁 (故事 I)"]] }
+          ],
+          "cond": "收到 Cozy Mart 寄出的信. 大部分連結需要登入.",
+          "done": "回到網站上對應的頁面.",
+          "next": "看是哪一封信, 接到對應的故事.",
+          "note": "所有信件連結都帶 <code>utm_source=email</code>, 用來算每封信帶回多少人."
+        },
+        {
+          "id": "O",
+          "title": "部落客文章裡的商品卡",
+          "lane": [
+            { "s": "ext", "cap": "合作部落格", "sub": "居家佈置文章", "url": "blog.homeliving.example/posts/{文章}", "who": "合作網站",
+              "see": ["文章: 小房間的收納技巧", "文中嵌入的 Cozy Mart 商品卡"],
+              "can": ["往下讀到商品卡"], "pick": "往下讀到商品卡" },
+            { "by": "看到商品卡" },
+            { "s": "page", "cap": "嵌入商品卡", "sub": "嵌在部落格文章裡", "url": "www.cozymart.example/embed/product-card?product={商品 id}&partner=homeliving", "who": "嵌在合作網站",
+              "see": ["商品照片, 價格", "加入購物車 按鈕"],
+              "can": ["加入購物車", "看完整商品頁"], "pick": "加入購物車" },
+            { "by": "按加入購物車" },
+            { "s": "modal", "cap": "登入視窗", "sub": "在部落格上彈出", "url": "www.cozymart.example/embed/login",
+              "see": ["Email 與密碼欄位"],
+              "can": ["登入"], "pick": "登入",
+              "side": [["瀏覽器擋第三方 cookie", "改開新分頁登入"]] },
+            { "by": "登入成功", "sys": "加入購物車, 記下合作夥伴" },
+            { "s": "page", "cap": "嵌入商品卡", "sub": "按鈕變成 去結帳", "url": "www.cozymart.example/embed/product-card?product={商品 id}&partner=homeliving", "who": "嵌在合作網站",
+              "see": ["已加入購物車"],
+              "can": ["去結帳"], "pick": "去結帳" },
+            { "by": "按去結帳" },
+            { "s": "page", "cap": "購物車", "sub": "新分頁開啟", "url": "www.cozymart.example/cart?ref=homeliving",
+              "see": ["剛加入的商品"],
+              "can": ["前往結帳 (故事 A)"] }
+          ],
+          "cond": "合作網站把商品卡嵌進自己的頁面. 顧客還沒離開部落格.",
+          "done": "商品進購物車, 合作夥伴記在這筆訂單上.",
+          "next": "在新分頁結帳 (故事 A).",
+          "note": "<b>分潤</b>顧客 7 天內在 Cozy Mart 下單, 都算這個合作夥伴帶來的."
+        }
+      ]
+    }
+  ],
+  "index": {
+    "byEntry": [
+      ["搜尋引擎", ["B"]],
+      ["社群分享", ["A"]],
+      ["廣告", ["M"]],
+      ["Email", ["N", "H"]],
+      ["合作網站嵌入", ["O"]],
+      ["直接進站", ["G", "I"]]
+    ],
+    "byGoal": [
+      ["買東西", ["A", "A2", "E", "F"]],
+      ["找商品 / 缺貨", ["B"]],
+      ["省錢", ["C", "M"]],
+      ["付款出問題", ["D"]],
+      ["帳號與登入", ["G", "H", "I"]],
+      ["訂單與退貨", ["J"]],
+      ["Plus 會員", ["K", "L"]]
+    ]
+  },
+  "routes": [
+    {
+      "title": "商品與購物車",
+      "items": [
+        { "path": "/", "desc": "首頁. 本週主打, 分類入口. 右上角可以登入或註冊." },
+        { "path": "/search", "desc": "搜尋結果. 商品卡片, 排序, 篩選. 從搜尋引擎進站的人多半落在這裡.",
+          "params": [["q", "關鍵字"], ["sort", "price_asc | price_desc | newest"], ["in_stock=1", "只看有貨"]] },
+        { "path": "/products/{商品 id}", "desc": "商品頁. 所有分享, 廣告, 信件連結都落在這裡. 缺貨時按鈕變成 到貨通知我.",
+          "params": [["ref", "從哪裡來 (ig, homeliving)"], ["utm_source", "廣告或信件的來源"], ["variant", "預先選好的規格"]] },
+        { "path": "/cart", "desc": "購物車. 改數量, 優惠碼, 推薦商品, 免運提示.",
+          "params": [["coupon", "預先帶入的優惠碼"], ["ref", "從合作網站來時記下來源"]] },
+        { "path": "/wishlist", "desc": "願望清單. 要登入. 可以全部加入購物車." }
+      ]
+    },
+    {
+      "title": "結帳與付款 (要登入)",
+      "items": [
+        { "path": "/checkout", "desc": "結帳. 收件地址, 運送方式, 付款方式, 確認頁.",
+          "params": [["step", "address | payment | review"]] },
+        { "path": "/checkout/address", "desc": "填寫收件地址. 存進帳號的地址簿." },
+        { "path": "/checkout/payment", "desc": "付款. 信用卡, 已存的卡, 貨到付款. 3D 驗證視窗蓋在這頁上.",
+          "params": [["retry=1", "付款失敗後回來重試"]] },
+        { "path": "/checkout/complete/{訂單編號}", "desc": "訂單完成. 顯示訂單編號與預計到貨日." }
+      ]
+    },
+    {
+      "title": "帳號",
+      "items": [
+        { "path": "/login", "desc": "登入頁. Email 密碼或 Google 帳號.",
+          "params": [["next", "登入後要回去的頁"]] },
+        { "path": "/register", "desc": "註冊, 分三步: 帳號, 驗證 Email, 喜好.",
+          "params": [["step", "1 | 2 | 3"]] },
+        { "path": "/forgot-password", "desc": "輸入 Email, 寄出重設密碼信." },
+        { "path": "/reset-password", "desc": "設定新密碼. 連結 30 分鐘內有效, 只能用一次.",
+          "params": [["token", "信裡帶的一次性代碼"]] },
+        { "path": "/account", "desc": "我的帳號. 會員等級, 優惠券, 地址簿, 訂單入口." }
+      ]
+    },
+    {
+      "title": "會員",
+      "items": [
+        { "path": "/plus", "desc": "Plus 會員介紹頁. 列出權益與價格." },
+        { "path": "/plus/checkout", "desc": "Plus 付款. 月繳或年繳.",
+          "params": [["plan", "monthly | yearly"]] },
+        { "path": "/account/membership", "desc": "會員管理. 方案, 下次扣款日, 取消或恢復." },
+        { "path": "/account/membership/cancel", "desc": "取消流程. 先問原因, 再顯示挽留優惠.",
+          "params": [["step", "reason | offer"]] },
+        { "path": "/admin/memberships", "desc": "後台: 查會員狀態, 手動延長或退費.", "admin": true }
+      ]
+    },
+    {
+      "title": "訂單",
+      "items": [
+        { "path": "/account/orders", "desc": "我的訂單. 依狀態篩選." },
+        { "path": "/account/orders/{訂單編號}", "desc": "訂單明細. 商品, 物流進度, 發票, 退貨入口.",
+          "params": [["utm_source=email", "從信件點進來"]] },
+        { "path": "/account/orders/{訂單編號}/return", "desc": "申請退貨. 超過 7 天鑑賞期就進不來." },
+        { "path": "/admin/returns", "desc": "後台: 退貨單審核, 安排收件.", "admin": true }
+      ]
+    },
+    {
+      "title": "廣告活動頁 (活動結束會轉回首頁)",
+      "items": [
+        { "path": "/lp/flash-sale", "desc": "限時折扣活動頁. 倒數計時與主打商品.",
+          "params": [["campaign", "活動代號"], ["utm_source", "廣告來源"]] },
+        { "path": "/lp/flash-sale/register", "desc": "快速註冊. 只要 Email 和密碼, 沒有喜好步驟." },
+        { "path": "/lp/flash-sale/coupon", "desc": "領取成功. 顯示優惠券代碼與倒數." }
+      ]
+    },
+    {
+      "title": "嵌入元件 (合作網站)",
+      "items": [
+        { "path": "/embed/product-card", "desc": "可以嵌進別人網頁的商品卡. 顯示價格與加入購物車.",
+          "params": [["product", "商品 id"], ["partner", "合作夥伴代號, 用來算分潤"]] },
+        { "path": "/embed/login", "desc": "嵌入元件用的登入視窗. 擋第三方 cookie 時改開新分頁." },
+        { "path": "/admin/embed-preview", "desc": "後台: 預覽合作夥伴的商品卡長什麼樣.", "admin": true }
+      ]
+    },
+    {
+      "title": "外部網站 (故事裡出現的)",
+      "items": [
+        { "path": "instagram.com", "match": "instagram.com", "desc": "社群分享與品牌廣告的貼文." },
+        { "path": "facebook.com", "match": "facebook.com", "desc": "限時折扣的贊助廣告." },
+        { "path": "google.com/search", "match": "google.com/search", "desc": "搜尋引擎. 結果頁連到我們的搜尋頁或商品頁." },
+        { "path": "mail.example.com", "match": "mail.example.com", "desc": "顧客的信箱. 代表 Cozy Mart 寄出的各種信." },
+        { "path": "secure.examplebank.example", "match": "examplebank.example", "desc": "發卡銀行的 3D 驗證頁. 不在我們的網站上." },
+        { "path": "blog.homeliving.example", "match": "homeliving.example", "desc": "合作部落格. 文章裡嵌入我們的商品卡." }
+      ]
+    }
+  ],
+  "reference": [
+    {
+      "type": "issues",
+      "summary": "發現的問題與沒確認的事",
+      "open": true,
+      "items": [
+        { "status": "confirmed", "title": "電子報的 取消訂閱 連結壞掉", "text": "信裡連到舊網址 <code>/unsubscribe</code>, 那一頁已經移除. 新的設定在我的帳號裡. 見故事 N." },
+        { "status": "confirmed", "title": "從結帳頁登入後被帶回首頁", "text": "結帳頁的登入視窗沒有帶 <code>next</code>, 登入後回首頁; 購物車還在, 但要重新按結帳. 見故事 I." },
+        { "status": "confirmed", "title": "預留庫存快到期時沒有提醒", "text": "結帳頁沒有倒數. 15 分鐘過了, 要到按確認付款時才知道商品被放回去. 見故事 A." },
+        { "status": "open", "title": "取消挽留優惠對非首次訂閱者疑似不顯示", "text": "曾經取消又重新訂閱的會員, 取消時直接跳過挽留視窗. 不確定是刻意的規則還是 bug. 見故事 L." },
+        { "status": "open", "title": "到貨通知多久寄出", "text": "補貨後多久寄信, 由倉儲系統決定, 這份圖看不到." }
+      ]
+    },
+    {
+      "type": "cards",
+      "summary": "四種購買方式怎麼分",
+      "cards": [
+        { "title": "立即購買", "text": "跳過購物車, 只買這一件, 直接到結帳頁. 購物車裡原本的商品不受影響." },
+        { "title": "加入購物車", "text": "最常見的方式. 可以和其他商品一起結帳, 一起算免運門檻." },
+        { "title": "訂閱配送", "text": "消耗品才有, 例如香氛補充瓶. 每 1, 2 或 3 個月自動出貨扣款, 可以隨時暫停." },
+        { "title": "到貨通知", "text": "缺貨時才出現. 只是登記, 不會自動下單; 補貨時寄信, 顧客自己回來買." }
+      ],
+      "note": "商品頁顯示哪些按鈕, 看商品的庫存與類型: 有貨就有 立即購買 和 加入購物車; 消耗品多一個 訂閱配送; 全部缺貨只剩 到貨通知."
+    },
+    {
+      "type": "table",
+      "summary": "三種店型的差異",
+      "columns": ["店型", "網址", "誰能買", "付款方式", "其他"],
+      "rows": [
+        ["一般商店", "www.cozymart.example", "任何人, 結帳要登入", "信用卡, 貨到付款", "有 Plus 會員, 優惠碼, 廣告活動頁"],
+        ["企業採購站", "business.cozymart.example", "公司帳號底下的員工", "月結發票", "沒有優惠碼; 訂單要主管核准才出貨"],
+        ["員工福利站", "perks.cozymart.example", "合作公司的員工, 用公司 Email 註冊", "福利點數, 不足再刷卡", "只賣挑選過的商品, 沒有 Plus 會員"]
+      ]
+    }
+  ]
+}
+</script>
+<!-- ===================== 資料區 (結束) ===================== -->
+
+<!-- ===================== 結構區 (render script) =====================
+     通用引擎, 不含任何主題內容. 文字一律來自資料區, 或下面的 UI 字串物件. -->
+<script>
+/* 通用 UI 文字. 資料區可用 "ui": { ... } 覆寫任一項. */
+const UI_DEFAULT = {
+  whoPage: '我們的網站', whoModal: '彈出視窗', whoExt: '外部網站',
+  see: '看得到', can: '可以做', sideIf: '如果', forkIf: '如果', forkThen: '→',
+  sys: '系統: ', params: '參數', admin: 'admin', openIssue: '沒確認: ',
+  factCond: '出現條件', factDone: '完成', factNext: '接著', factNote: '補充',
+  urlAria: '完整網址 {url}, 點一下看網址索引', back: '↩ 回到故事 {id}',
+  missingRoute: '網址索引缺少:', missingStory: '流程索引指到不存在的故事:',
+  loadError: '資料區讀取或畫圖失敗'
+};
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fill = (tpl, o) => tpl.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? '');
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const smooth = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+
+/* 一行一個訊息: 依句號或分號斷行, 並拿掉行尾的句號. 開頭的 <b>標題</b> 保留在最前面 */
+function splitLines(h) {
+  const m = h.match(/^(\s*<b>[\s\S]*?<\/b>)([\s\S]*)$/);
+  const head = m ? m[1] : '', body = m ? m[2] : h;
+  // HTML 實體 (&quot; &amp;) 結尾的分號不算斷句; 斷行後行首殘留的 , ; 拿掉
+  const parts = body.split(/(?<=\.)\s+|(?<!&[a-z#0-9]+);\s+/).map(t => t.trim().replace(/^[,;]\s*/, '').replace(/\.$/, '').replace(/(?<!&[a-z#0-9]+);$/, '')).filter(Boolean);
+  return head + parts.map(t => `<span class="l">${t}</span>`).join('');
+}
+
+function render(D, UI) {
+  const BASE = String(D.baseUrl || '').replace(/\/+$/, '');
+  const S = D.sections || {};
+  const setText = (id, t) => { const el = document.getElementById(id); el.textContent = t ?? ''; if (t) el.hidden = false; };
+
+  /* ---------- 頁首: title, h1, 副標, 圖例 ---------- */
+  document.title = D.page.title;
+  setText('page-h1', D.page.h1);
+  setText('page-sub', D.page.subtitle);
+  document.getElementById('legend').innerHTML = (D.legend || []).map(x =>
+    `<div><span class="ico k-${esc(x.kind)}"></span><span><b>${esc(x.title)}</b>${esc(x.text)}</span></div>`).join('');
+  setText('idx-title', S.index); setText('idx-entry-title', S.indexByEntry); setText('idx-goal-title', S.indexByGoal);
+  setText('ref-title', S.reference); setText('ref-intro', S.referenceIntro); setText('uidx-title', S.urlIndex);
+
+  /* ---------- 網址 -> 網址索引列 ---------- */
+  const isInternal = url => BASE && (url === BASE || url.startsWith(BASE + '/') || url.startsWith(BASE + '?'));
+  const ROUTE_LIST = [];
+  D.routes.forEach((g, gi) => g.items.forEach((it, ii) => {
+    const id = `u-${gi}-${ii}`;
+    if (it.match) ROUTE_LIST.push({ id, match: it.match });
+    else ROUTE_LIST.push({ id, path: it.path, re: new RegExp('^' + it.path.split(/\{[^}]*\}/).map(reEsc).join('[^/]+') + '$') });
+  }));
+  function routeOf(url) {
+    if (isInternal(url)) {
+      const p = url.slice(BASE.length).split(/[?#]/)[0] || '/';
+      const r = ROUTE_LIST.find(r => r.path === p) || ROUTE_LIST.find(r => r.re && r.re.test(p));
+      return r ? r.id : '';
+    }
+    const r = ROUTE_LIST.find(r => r.match && url.includes(r.match));
+    return r ? r.id : '';
+  }
+  const shownUrl = url => isInternal(url) ? (url.slice(BASE.length) || '/') : url;
+  const USED = {};
+
+  /* ---------- 故事 ---------- */
+  const list = (h, arr, pick) => arr && arr.length ? `<div class="blk"><div class="h">${esc(h)}</div><ul>${arr.map(t => `<li${t === pick ? ' class="pick"' : ''}>${esc(t)}</li>`).join('')}</ul></div>` : '';
+  function screen(x) {
+    const cls = x.s === 'ext' ? ' ext' : x.s === 'modal' ? ' modal' : '';
+    const who = x.who || (x.s === 'modal' ? UI.whoModal : x.s === 'ext' ? UI.whoExt : UI.whoPage);
+    const side = (x.side || []).map(([i, t]) => `<div><b>${esc(UI.sideIf)}</b> ${esc(i)}: ${esc(t)}</div>`).join('');
+    return `<div class="scr"><div class="cap">${esc(x.cap)}${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</div>
+    <div class="win${cls}"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="uw" data-key="${esc(routeOf(x.url))}" data-url="${esc(x.url)}"><button type="button" class="url" aria-label="${esc(fill(UI.urlAria, { url: x.url }))}">${esc(shownUrl(x.url))}</button><span class="full" aria-hidden="true">${esc(x.url)}</span></span><span class="who">${esc(who)}</span></div>
+    <div class="body">${list(UI.see, x.see)}${list(UI.can, x.can, x.pick)}</div></div>${side ? `<div class="side">${side}</div>` : ''}</div>`;
+  }
+  const arrow = x => `<div class="go"><span class="by">${esc(x.by)}</span><span class="ln"></span>${x.sys ? `<span class="sys"><b>${esc(UI.sys)}</b>${esc(x.sys)}</span>` : ''}</div>`;
+  const fork = x => `<div class="fork"><div class="cap">${esc(x.fork)}</div>${x.items.map(([i, t, c]) => `<div class="fk${c === 'bad' ? ' badk' : ''}"><div class="if">${esc(UI.forkIf)} ${esc(i)}</div><div class="then">${esc(UI.forkThen)} ${esc(t)}</div></div>`).join('')}</div>`;
+  const fact = (lb, tx) => tx ? `<div class="fact"><span class="lb">${esc(lb)}</span><span class="tx">${splitLines(tx)}</span></div>` : '';
+
+  const root = document.getElementById('stories');
+  const byId = {};
+  D.groups.forEach(g => {
+    const sec = document.createElement('section'); sec.className = 'group';
+    sec.innerHTML = `<h2>${esc(g.title)}</h2>${g.intro ? `<p class="sec-intro">${esc(g.intro)}</p>` : ''}`;
+    g.stories.forEach(st => {
+      byId[st.id] = st;
+      const lane = st.lane.map(x => x.by !== undefined ? arrow(x) : x.fork ? fork(x) : screen(x)).join('');
+      st.lane.forEach(x => { if (x.url) { const k = routeOf(x.url); if (k) (USED[k] ||= new Set()).add(st.id); } });
+      const el = document.createElement('article'); el.className = 'story'; el.id = 's-' + st.id;
+      // cond / note 可含 HTML (<b> <code>); done / next 是純文字
+      el.innerHTML = `<div class="st-head"><span class="st-id">${esc(st.id)}</span><h3>${esc(st.title)}</h3></div>
+      <div class="lane">${lane}</div>
+      <div class="facts">${fact(UI.factCond, st.cond)}${fact(UI.factDone, esc(st.done))}${fact(UI.factNext, st.next ? esc(st.next) : '')}${fact(UI.factNote, st.note)}</div>`;
+      sec.appendChild(el);
+    });
+    root.appendChild(sec);
+  });
+
+  /* ---------- 流程索引 ---------- */
+  const badIds = new Set();
+  const link = id => {
+    if (!byId[id]) { badIds.add(id); return ''; }
+    const label = byId[id].short || byId[id].title.split(/[:,]/)[0];
+    return `<a class="sl" href="#s-${esc(id)}"><b>${esc(id)}</b>${esc(label)}</a>`;
+  };
+  const idx = (el, rows) => document.getElementById(el).innerHTML = (rows || []).map(([k, ids]) =>
+    `<div class="idx-row"><span class="k">${esc(k)}</span><span class="links">${ids.map(link).join('')}</span></div>`).join('');
+  idx('idx-entry', D.index.byEntry); idx('idx-goal', D.index.byGoal);
+
+  /* ---------- 參考資料: issues / cards / table ---------- */
+  const REF = {
+    issues: r => `<ul class="issues">${r.items.map(i => `<li${i.status === 'open' ? ' class="q"' : ''}><b>${i.status === 'open' ? esc(UI.openIssue) : ''}${esc(i.title)}</b>${i.text}</li>`).join('')}</ul>`,
+    cards: r => `<div class="plain">${r.cards.map(c => `<div><b>${esc(c.title)}</b>${c.text}</div>`).join('')}</div>${r.note ? `<p class="meta" style="margin-top:10px">${r.note}</p>` : ''}`,
+    table: r => {
+      r.rows.forEach((row, i) => { if (row.length !== r.columns.length) console.warn(`參考資料表格 "${r.summary}" 第 ${i + 1} 列有 ${row.length} 格, 欄位有 ${r.columns.length} 個`); });
+      return `<div class="tbl"><table><thead><tr>${r.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${r.rows.map(row => `<tr>${row.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    }
+  };
+  document.getElementById('ref-body').innerHTML = (D.reference || []).map(r => {
+    if (!REF[r.type]) throw new Error(`reference[].type 不認得: ${r.type} (只支援 issues, cards, table)`);
+    return `<details${r.open ? ' open' : ''}><summary>${esc(r.summary)}</summary><div class="in">${REF[r.type](r)}</div></details>`;
+  }).join('');
+  if (!(D.reference || []).length) document.getElementById('reference').hidden = true;
+
+  /* ---------- 網址索引 ---------- */
+  document.getElementById('uidx').innerHTML = D.routes.map((g, gi) => `<div class="ug"><h3>${esc(g.title)}</h3>${g.items.map((it, ii) => {
+    const id = `u-${gi}-${ii}`;
+    const ids = [...(USED[id] || [])];
+    return `<div class="ur" id="${id}"><div><div class="p">${esc(it.path)}${it.admin ? `<span class="tag">${esc(UI.admin)}</span>` : ''}</div>${ids.length ? `<div class="st">${ids.map(link).join('')}</div>` : ''}</div>
+    <div><div class="desc">${splitLines(esc(it.desc))}</div>${it.params ? `<div class="q"><div class="qh">${esc(UI.params)}</div><ul>${it.params.map(([k, v]) => `<li><code>${esc(k)}</code> ${esc(v)}</li>`).join('')}</ul></div>` : ''}</div></div>`;
+  }).join('')}</div>`).join('');
+
+  /* ---------- 互動: 點網址跳索引 + flash, 浮動返回按鈕 ---------- */
+  function flash(el) {
+    el.scrollIntoView({ behavior: smooth(), block: 'center' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 2400);
+  }
+  const back = document.createElement('button');
+  back.type = 'button'; back.className = 'back'; back.hidden = true;
+  document.body.appendChild(back);
+  let origin = null;
+  back.addEventListener('click', () => {
+    if (!origin) return;
+    flash(origin.closest('.win'));
+    back.hidden = true; origin = null;
+  });
+  document.addEventListener('click', e => {
+    const w = e.target.closest('.uw');
+    if (!w) return;
+    const row = w.dataset.key && document.getElementById(w.dataset.key);
+    if (!row) return;
+    origin = w;
+    back.textContent = fill(UI.back, { id: w.closest('.story').id.replace('s-', '') });
+    back.hidden = false;
+    flash(row);
+  });
+
+  /* ---------- 開發自檢 ---------- */
+  const missing = [...document.querySelectorAll('.uw')].filter(w => !w.dataset.key).map(w => w.dataset.url);
+  if (missing.length) console.warn(UI.missingRoute, [...new Set(missing)]);
+  if (badIds.size) console.warn(UI.missingStory, [...badIds]);
+
+  /* 說明文字一行一個訊息 */
+  document.querySelectorAll('.sec-intro, .plain div, .plain + .meta, .issues li').forEach(el => { el.innerHTML = splitLines(el.innerHTML); });
+}
+
+(() => {
+  let UI = UI_DEFAULT;
+  try {
+    const D = JSON.parse(document.getElementById('screen-flow-data').textContent);
+    UI = { ...UI_DEFAULT, ...(D.ui || {}) };
+    render(D, UI);
+  } catch (e) {
+    // 誠實顯示錯誤: 放在頁面最上方, 不留半張圖
+    console.error(e);
+    const box = document.createElement('div'); box.className = 'err'; box.setAttribute('role', 'alert');
+    box.textContent = `${UI.loadError}: ${e && e.message || e}`;
+    document.querySelector('.wrap').prepend(box);
+  }
+})();
+</script>
+</body>
+</html>

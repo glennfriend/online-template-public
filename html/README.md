@@ -9,3 +9,4 @@
 | [依賴血緣圖 (Field-level Data Lineage Graph)](field-level-data-lineage-graph/) | 一張圖看懂 `一個值, 要靠哪些東西才算得出來` | [Demo](https://glennfriend.github.io/online-template-public/html/field-level-data-lineage-graph/) |
 | [歷史時間軸地圖 (History Timeline Map)](history-timeline-map/) | 拖動時間軸, 看每一年由誰統治、統治範圍多大 | [Demo](https://glennfriend.github.io/online-template-public/html/history-timeline-map/) |
 | [放假日曆 (Holiday Calendar)](holiday-calendar/) | 一年的放假日整理成 TSV / 純文字 calendar / Markdown table 三種可複製格式 | [Demo](https://glennfriend.github.io/online-template-public/html/holiday-calendar/) |
+| [畫面流程地圖 (Screen Flow Map)](screen-flow-map/) | 把網站的使用流程畫成一個個故事: 從哪裡進站, 依序看到哪些畫面, 按了什麼; 附網址索引, 單一 html 檔, 範例是虛構購物網站 | [Demo](https://glennfriend.github.io/online-template-public/html/screen-flow-map/) |
